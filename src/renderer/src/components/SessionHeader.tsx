@@ -6,8 +6,10 @@ interface Props {
   session: SessionInfo
   workspaces: Workspace[]
   hasTerminal: boolean
-  onContinue: () => void
+  hasChat: boolean
+  onOpenTerminal: () => void
   onCloseTerminal: () => void
+  onCloseChat: () => void
   onToggleWorkspace: (wsId: string, assigned: boolean) => void
 }
 
@@ -39,10 +41,15 @@ export function SessionHeader({ session: s, workspaces, ...p }: Props): React.JS
         <span><b>ORIGEM</b>{s.source === 'desktop' ? 'Claude Desktop' : 'Terminal'}</span>
       </div>
       <div className="actions">
+        {p.hasChat && (
+          <button className="btn danger" onClick={p.onCloseChat} title="Encerra o processo do Claude desta sessão">
+            ■ Encerrar chat
+          </button>
+        )}
         {p.hasTerminal ? (
           <button className="btn danger" onClick={p.onCloseTerminal}>■ Encerrar terminal</button>
         ) : (
-          <button className="btn primary" onClick={p.onContinue}>▶ Continuar sessão</button>
+          <button className="btn" onClick={p.onOpenTerminal}>⌨ Abrir no terminal</button>
         )}
         <div className="ws-picker" ref={ref}>
           <button className="btn" onClick={() => setMenu((m) => !m)}>◆ Workspaces</button>

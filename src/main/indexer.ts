@@ -268,7 +268,7 @@ export async function readTranscript(file: string, limit = 400): Promise<Transcr
   return ring
 }
 
-function toMessage(d: any): TranscriptMessage | null {
+export function toMessage(d: any): TranscriptMessage | null {
   if (d.type === 'system' && d.subtype === 'compact_boundary') {
     return { uuid: d.uuid, role: 'system', timestamp: d.timestamp, blocks: [{ kind: 'text', text: 'Conversa compactada' }] }
   }
@@ -291,7 +291,7 @@ function toMessage(d: any): TranscriptMessage | null {
   return { uuid: d.uuid, role: d.type, timestamp: d.timestamp, blocks }
 }
 
-function summarizeInput(input: any): string {
+export function summarizeInput(input: any): string {
   if (!input || typeof input !== 'object') return ''
   const v = input.command ?? input.file_path ?? input.pattern ?? input.url ?? input.query ?? input.description ?? input.prompt
   return truncate(typeof v === 'string' ? v : JSON.stringify(input), 300) ?? ''

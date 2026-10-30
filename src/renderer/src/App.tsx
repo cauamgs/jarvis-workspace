@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { SessionInfo, Workspace } from '@shared/types'
 import { BootScreen } from './components/BootScreen'
+import { ChatView } from './components/ChatView'
 import { ArcReactor } from './components/ArcReactor'
 import { SessionHeader } from './components/SessionHeader'
 import { SessionList } from './components/SessionList'
 import { Sidebar, type View } from './components/Sidebar'
 import { TerminalView } from './components/TerminalView'
 import { TopBar } from './components/TopBar'
-import { Transcript } from './components/Transcript'
 import { WorkspaceModal } from './components/WorkspaceModal'
+import { useActiveChats } from './chatStore'
 import { inWorkspace, uuid } from './lib'
 
 interface TermSpec {
@@ -17,7 +18,7 @@ interface TermSpec {
   newSessionId?: string
 }
 
-type Tab = 'transcript' | 'terminal'
+type Tab = 'chat' | 'terminal'
 
 export default function App(): React.JSX.Element {
   const [sessions, setSessions] = useState<SessionInfo[] | null>(null)
@@ -27,11 +28,14 @@ export default function App(): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [tab, setTab] = useState<Tab>('transcript')
+  const [tab, setTab] = useState<Tab>('chat')
   const [terminals, setTerminals] = useState<Map<string, TermSpec>>(new Map())
   const [pending, setPending] = useState<Map<string, SessionInfo>>(new Map())
   const [modal, setModal] = useState<{ ws?: Workspace } | null>(null)
   const [liveWarn, setLiveWarn] = useState<string | null>(null)
+  const activeChats = useActiveChats()
+  /** Sessões com algo rodando dentro do Jarvis (terminal ou chat). */
+  const inJarvis = useMemo(() => new Set([...terminals.keys(), ...activeChats]), [terminals, activeChats])
 
   const reload = useCallback(async () => {
     const list = await window.jarvis.listSessions()
@@ -65,16 +69,16 @@ export default function App(): React.JSX.Element {
     for (const w of workspaces) ws[w.id] = active.filter((s) => inWorkspace(w, s)).length
     return {
       all: active.length,
-      live: all.filter((s) => s.live || terminals.has(s.id)).length,
+      live: all.filter((s) => s.live || inJarvis.has(s.id)).length,
       unassigned: active.filter((s) => !workspaces.some((w) => inWorkspace(w, s))).length,
       ws
     }
-  }, [all, active, workspaces, terminals])
+  }, [all, active, workspaces, inJarvis])
 
   const currentWs = view.kind === 'ws' ? workspaces.find((w) => w.id === view.id) : undefined
 
   const visible = useMemo(() => {
-    let list = view.kind === 'live' ? all.filter((s) => s.live || terminals.has(s.id)) : showArchived ? all : active
+    let list = view.kind === 'live' ? all.filter((s) => s.live || inJarvis.has(s.id)) : showArchived ? all : active
     if (view.kind === 'unassigned') list = list.filter((s) => !workspaces.some((w) => inWorkspace(w, s)))
     if (currentWs) list = list.filter((s) => inWorkspace(currentWs, s))
     const q = query.trim().toLowerCase()
@@ -83,7 +87,7 @@ export default function App(): React.JSX.Element {
         [s.title, s.projectName, s.branch, s.firstPrompt, s.lastPrompt].some((f) => f?.toLowerCase().includes(q))
       )
     return list
-  }, [view, all, active, showArchived, workspaces, currentWs, query, terminals])
+  }, [view, all, active, showArchived, workspaces, currentWs, query, inJarvis])
 
   const selected = all.find((s) => s.id === selectedId) ?? null
   const projectPaths = useMemo(() => [...new Set((sessions ?? []).map((s) => s.projectPath))].sort(), [sessions])
@@ -97,11 +101,11 @@ export default function App(): React.JSX.Element {
   function select(id: string): void {
     setSelectedId(id)
     setLiveWarn(null)
-    setTab(terminals.has(id) ? 'terminal' : 'transcript')
+    setTab(terminals.has(id) ? 'terminal' : 'chat')
   }
 
   function openTerminal(s: SessionInfo, force = false): void {
-    if (s.live && !terminals.has(s.id) && !force) {
+    if (s.live && !inJarvis.has(s.id) && !force) {
       setLiveWarn(s.id)
       return
     }
@@ -117,7 +121,7 @@ export default function App(): React.JSX.Element {
       n.delete(key)
       return n
     })
-    setTab('transcript')
+    setTab('chat')
     void reload()
   }
 
@@ -139,13 +143,12 @@ export default function App(): React.JSX.Element {
         createdAt: Date.now(),
         lastActivityAt: Date.now(),
         archived: false,
-        live: true,
+        live: false,
         filePath: ''
       })
     )
-    setTerminals((t) => new Map(t).set(id, { cwd, newSessionId: id }))
     setSelectedId(id)
-    setTab('terminal')
+    setTab('chat')
   }
 
   async function assign(wsId: string, sessionId: string, assigned: boolean): Promise<void> {
@@ -174,7 +177,7 @@ export default function App(): React.JSX.Element {
             sessions={visible}
             workspaces={workspaces}
             selectedId={selectedId}
-            terminals={new Set(terminals.keys())}
+            terminals={inJarvis}
             onSelect={select}
             query={query}
             onQuery={setQuery}
@@ -189,8 +192,10 @@ export default function App(): React.JSX.Element {
                   session={selected}
                   workspaces={workspaces}
                   hasTerminal={terminals.has(selected.id)}
-                  onContinue={() => openTerminal(selected)}
+                  hasChat={activeChats.has(selected.id)}
+                  onOpenTerminal={() => openTerminal(selected)}
                   onCloseTerminal={() => closeTerminal(selected.id)}
+                  onCloseChat={() => void window.jarvis.chatClose(selected.id)}
                   onToggleWorkspace={(wsId, on) => void assign(wsId, selected.id, on)}
                 />
                 {liveWarn === selected.id && (
@@ -202,9 +207,16 @@ export default function App(): React.JSX.Element {
                     </button>
                   </div>
                 )}
+                {tab === 'chat' && selected.live && !inJarvis.has(selected.id) && (
+                  <div className="warn">
+                    ⚠ Esta sessão está aberta em outro lugar (Claude Desktop ou terminal). Enviar mensagens daqui ao mesmo
+                    tempo pode gerar históricos divergentes.
+                  </div>
+                )}
                 <div className="tabs">
-                  <button className={`tab${tab === 'transcript' ? ' on' : ''}`} onClick={() => setTab('transcript')}>
-                    Transcrição
+                  <button className={`tab${tab === 'chat' ? ' on' : ''}`} onClick={() => setTab('chat')}>
+                    Chat
+                    {activeChats.has(selected.id) && <span className="live-dot term" style={{ marginTop: 0 }} />}
                   </button>
                   <button
                     className={`tab${tab === 'terminal' ? ' on' : ''}`}
@@ -214,15 +226,12 @@ export default function App(): React.JSX.Element {
                     {terminals.has(selected.id) && <span className="live-dot term" style={{ marginTop: 0 }} />}
                   </button>
                 </div>
-                {tab === 'transcript' && (
-                  <div className="panel-body">
-                    {selected.filePath ? (
-                      <Transcript sessionId={selected.id} version={version} />
-                    ) : (
-                      <div className="empty">A sessão aparecerá aqui após a primeira mensagem</div>
-                    )}
-                  </div>
-                )}
+                {tab === 'chat' &&
+                  (terminals.has(selected.id) ? (
+                    <div className="empty">Sessão aberta no terminal do Jarvis — encerre o terminal para usar o chat</div>
+                  ) : (
+                    <ChatView session={selected} version={version} />
+                  ))}
               </>
             ) : (
               <div className="idle">

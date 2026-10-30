@@ -1,23 +1,9 @@
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import * as pty from 'node-pty'
+import { cleanEnv } from './shellEnv'
 
 const MAX_BUFFER = 256 * 1024
-
-/**
- * Se o Jarvis for aberto de dentro de uma sessão do Claude Code (ex.: `npm run dev` pelo Claude),
- * herdaria variáveis que fazem o `claude` se achar uma sub-sessão e parar de gravar o transcript.
- * O shell de login recarrega o ambiente real do usuário depois.
- */
-const INHERITED = /^(CLAUDE|ANTHROPIC_|MCP_|CCD_|ELECTRON_|VITE_)/
-
-function cleanEnv(): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [k, v] of Object.entries(process.env)) {
-    if (v !== undefined && !INHERITED.test(k)) env[k] = v
-  }
-  return env
-}
 
 interface Term {
   proc: pty.IPty

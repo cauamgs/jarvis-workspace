@@ -26,6 +26,16 @@ const api: JarvisApi = {
   onPtyData: (cb) => subscribe('pty:data', cb),
   onPtyExit: (cb) => subscribe('pty:exit', cb),
 
+  chatSend: (o) => ipcRenderer.invoke('chat:send', o),
+  chatInterrupt: (k) => ipcRenderer.invoke('chat:interrupt', k),
+  chatClose: (k) => ipcRenderer.invoke('chat:close', k),
+  chatSetPermissionMode: (k, m) => ipcRenderer.invoke('chat:setPermissionMode', k, m),
+  chatSetModel: (k, m) => ipcRenderer.invoke('chat:setModel', k, m),
+  chatRespondPermission: (k, id, d) => ipcRenderer.send('chat:permission', k, id, d),
+  chatActive: () => ipcRenderer.invoke('chat:active'),
+  chatInfo: (k) => ipcRenderer.invoke('chat:info', k),
+  onChatEvent: (cb) => subscribe('chat:event', cb),
+
   pickDirectory: () => ipcRenderer.invoke('sys:pickDirectory'),
   openInFinder: (p) => ipcRenderer.send('sys:openInFinder', p),
   homeDir: homedir()

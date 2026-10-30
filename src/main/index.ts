@@ -1,19 +1,24 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import { watch, type FSWatcher } from 'node:fs'
+import { mkdirSync, watch, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
+import { ChatManager } from './chat'
 import { DESKTOP_DIR, PROJECTS_DIR, readTranscript, SessionIndexer } from './indexer'
 import { PtyManager } from './pty'
 import { WorkspaceStore } from './store'
-import type { Workspace } from '@shared/types'
+import type { ChatSendOptions, PermissionMode, Workspace } from '@shared/types'
 
 let win: BrowserWindow | null = null
+// A versão de desenvolvimento usa dados próprios para rodar ao lado do app instalado.
+if (!app.isPackaged) app.setPath('userData', app.getPath('userData') + ' (dev)')
 const userData = app.getPath('userData')
+mkdirSync(userData, { recursive: true })
 const indexer = new SessionIndexer(join(userData, 'session-index.json'))
 const store = new WorkspaceStore(join(userData, 'workspaces.json'))
 const ptys = new PtyManager(
   (key, data) => win?.webContents.send('pty:data', key, data),
   (key, code) => win?.webContents.send('pty:exit', key, code)
 )
+const chats = new ChatManager((key, ev) => win?.webContents.send('chat:event', key, ev))
 const watchers: FSWatcher[] = []
 
 function createWindow(): void {
@@ -34,6 +39,17 @@ function createWindow(): void {
     }
   })
   win.once('ready-to-show', () => win?.show())
+  // Links (ex.: no Markdown do chat) abrem no navegador, nunca dentro do app.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url !== win?.webContents.getURL()) {
+      e.preventDefault()
+      if (/^https?:/.test(url)) void shell.openExternal(url)
+    }
+  })
   win.on('closed', () => (win = null))
 
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -76,6 +92,8 @@ function registerIpc(): void {
   )
 
   ipcMain.handle('pty:start', (_e, o: { key: string; cwd: string; resumeId?: string; newSessionId?: string }) => {
+    // Chat e terminal na mesma sessão ao mesmo tempo gerariam históricos divergentes.
+    chats.close(o.key)
     try {
       return { ok: true, ...ptys.start(o.key, o.cwd, o.resumeId, o.newSessionId) }
     } catch (err) {
@@ -86,6 +104,20 @@ function registerIpc(): void {
   ipcMain.on('pty:write', (_e, key: string, data: string) => ptys.write(key, data))
   ipcMain.on('pty:resize', (_e, key: string, cols: number, rows: number) => ptys.resize(key, cols, rows))
   ipcMain.on('pty:kill', (_e, key: string) => ptys.kill(key))
+
+  ipcMain.handle('chat:send', (_e, o: ChatSendOptions) => {
+    if (ptys.has(o.key)) return { ok: false, error: 'Esta sessão está aberta no terminal do Jarvis. Encerre o terminal primeiro.' }
+    return chats.send(o)
+  })
+  ipcMain.handle('chat:interrupt', (_e, key: string) => chats.interrupt(key))
+  ipcMain.handle('chat:close', (_e, key: string) => chats.close(key))
+  ipcMain.handle('chat:setPermissionMode', (_e, key: string, mode: PermissionMode) => chats.setPermissionMode(key, mode))
+  ipcMain.handle('chat:setModel', (_e, key: string, model: string) => chats.setModel(key, model))
+  ipcMain.handle('chat:active', () => chats.active())
+  ipcMain.handle('chat:info', (_e, key: string) => chats.info(key))
+  ipcMain.on('chat:permission', (_e, key: string, id: string, decision: 'allow' | 'always' | 'deny') =>
+    chats.respondPermission(key, id, decision)
+  )
 
   ipcMain.handle('sys:pickDirectory', async () => {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] })
@@ -115,6 +147,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   ptys.killAll()
+  chats.closeAll()
   watchers.forEach((w) => w.close())
   void indexer.persist()
 })

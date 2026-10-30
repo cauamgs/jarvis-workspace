@@ -28,6 +28,9 @@ Gera o `.app` (Apple Silicon), assina ad-hoc e instala em `/Applications/Jarvis 
   Cache incremental em `~/Library/Application Support/jarvis-workspace/session-index.json`.
 - **Workspaces** (`src/main/store.ts`) ficam em `workspaces.json` no mesmo diretório e só referenciam IDs de sessão.
   Pastas vinculadas incluem automaticamente as sessões daquele projeto.
+- **Chat** (`src/main/chat.ts`) usa o Claude Agent SDK apontando para o `claude` instalado do usuário
+  (mesmo login, settings, CLAUDE.md e MCPs). Retoma sessões existentes (`resume`) ou cria novas com ID
+  reservado (`sessionId`); pedidos de permissão viram cartões na interface. O processo fecha após 20 min ocioso.
 - **Terminal** (`src/main/pty.ts`) roda `claude --resume <id>` (ou `--session-id` para sessões novas) num PTY.
 
 Os formatos do Claude são internos e podem mudar — o Jarvis nunca escreve neles.

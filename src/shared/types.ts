@@ -47,6 +47,40 @@ export type TranscriptBlock =
   | { kind: 'tool_use'; name: string; input: string }
   | { kind: 'tool_result'; text: string; isError?: boolean }
 
+export type PermissionMode = 'default' | 'acceptEdits' | 'plan' | 'auto' | 'bypassPermissions'
+
+export interface ChatPermissionRequest {
+  id: string
+  toolName: string
+  title: string
+  description?: string
+  detail: string
+  canAlwaysAllow: boolean
+}
+
+export type ChatState = 'idle' | 'starting' | 'running' | 'error'
+
+/** Eventos do chat (Agent SDK) enviados do processo principal para a interface. */
+export type ChatEvent =
+  | { type: 'state'; state: ChatState; error?: string }
+  | { type: 'init'; model: string; permissionMode: PermissionMode; models: { value: string; label: string }[] }
+  | { type: 'message'; message: TranscriptMessage }
+  | { type: 'draft'; kind: 'text' | 'thinking'; text: string }
+  | { type: 'draft-clear' }
+  | { type: 'permission'; request: ChatPermissionRequest }
+  | { type: 'permission-done'; id: string }
+  | { type: 'result'; costUsd?: number; durationMs: number; isError: boolean; error?: string }
+
+export interface ChatSendOptions {
+  key: string
+  cwd: string
+  text: string
+  resumeId?: string
+  newSessionId?: string
+  permissionMode: PermissionMode
+  model?: string
+}
+
 export interface JarvisApi {
   listSessions(): Promise<SessionInfo[]>
   getTranscript(sessionId: string): Promise<TranscriptMessage[]>
@@ -69,6 +103,16 @@ export interface JarvisApi {
   ptyKill(key: string): void
   onPtyData(cb: (key: string, data: string) => void): () => void
   onPtyExit(cb: (key: string, code: number) => void): () => void
+
+  chatSend(o: ChatSendOptions): Promise<{ ok: boolean; error?: string }>
+  chatInterrupt(key: string): Promise<void>
+  chatClose(key: string): Promise<void>
+  chatSetPermissionMode(key: string, mode: PermissionMode): Promise<void>
+  chatSetModel(key: string, model: string): Promise<void>
+  chatRespondPermission(key: string, id: string, decision: 'allow' | 'always' | 'deny'): void
+  chatActive(): Promise<string[]>
+  chatInfo(key: string): Promise<{ init?: ChatEvent; running: boolean } | null>
+  onChatEvent(cb: (key: string, ev: ChatEvent) => void): () => void
 
   pickDirectory(): Promise<string | null>
   openInFinder(path: string): void
