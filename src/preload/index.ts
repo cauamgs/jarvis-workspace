@@ -36,6 +36,13 @@ const api: JarvisApi = {
   chatInfo: (k) => ipcRenderer.invoke('chat:info', k),
   onChatEvent: (cb) => subscribe('chat:event', cb),
 
+  onNav: (cb) => subscribe('nav', cb),
+  navigate: (req) => ipcRenderer.send('nav:request', req),
+  hidePalette: () => ipcRenderer.send('palette:hide'),
+  showPalette: () => ipcRenderer.send('palette:show'),
+  onPaletteShown: (cb) => subscribe('palette:shown', cb),
+  shortcutLabel: ipcRenderer.sendSync('sys:shortcutLabel'),
+
   pickDirectory: () => ipcRenderer.invoke('sys:pickDirectory'),
   openInFinder: (p) => ipcRenderer.send('sys:openInFinder', p),
   homeDir: homedir()

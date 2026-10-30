@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { SessionInfo, Workspace } from '@shared/types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { NavRequest, SessionInfo, Workspace } from '@shared/types'
 import { BootScreen } from './components/BootScreen'
 import { ChatView } from './components/ChatView'
 import { ArcReactor } from './components/ArcReactor'
@@ -9,7 +9,7 @@ import { Sidebar, type View } from './components/Sidebar'
 import { TerminalView } from './components/TerminalView'
 import { TopBar } from './components/TopBar'
 import { WorkspaceModal } from './components/WorkspaceModal'
-import { useActiveChats } from './chatStore'
+import { chatStore, useActiveChats } from './chatStore'
 import { inWorkspace, uuid } from './lib'
 
 interface TermSpec {
@@ -61,7 +61,12 @@ export default function App(): React.JSX.Element {
       setPending((p) => new Map([...p].filter(([k]) => !ids.has(k))))
   }, [sessions, pending])
 
-  const all = useMemo(() => [...pending.values(), ...(sessions ?? [])], [sessions, pending])
+  const all = useMemo(() => {
+    const indexed = sessions ?? []
+    const ids = new Set(indexed.map((s) => s.id))
+    // Uma sessão pendente some assim que o índice a encontra no disco.
+    return [...[...pending.values()].filter((p) => !ids.has(p.id)), ...indexed]
+  }, [sessions, pending])
   const active = useMemo(() => all.filter((s) => !s.archived), [all])
 
   const counts = useMemo(() => {
@@ -125,31 +130,85 @@ export default function App(): React.JSX.Element {
     void reload()
   }
 
-  async function newSession(): Promise<void> {
-    const cwd = currentWs?.autoPaths.length === 1 ? currentWs.autoPaths[0] : await window.jarvis.pickDirectory()
+  async function newSession(opts: { cwd?: string; workspaceId?: string; text?: string } = {}): Promise<void> {
+    const wsId = opts.workspaceId ?? currentWs?.id
+    const cwd =
+      opts.cwd ??
+      (currentWs?.autoPaths.length === 1 ? currentWs.autoPaths[0] : await window.jarvis.pickDirectory())
     if (!cwd) return
     const id = uuid()
-    if (currentWs) setWorkspaces(await window.jarvis.assignSession(currentWs.id, id, true))
-    const name = cwd.split('/').pop() || cwd
-    setPending((p) =>
-      new Map(p).set(id, {
-        id,
-        title: 'Nova sessão',
-        source: 'cli',
-        cwd,
-        projectPath: cwd,
-        projectName: name,
-        messageCount: 0,
-        createdAt: Date.now(),
-        lastActivityAt: Date.now(),
-        archived: false,
-        live: false,
-        filePath: ''
-      })
-    )
+    if (wsId) setWorkspaces(await window.jarvis.assignSession(wsId, id, true))
+    const session: SessionInfo = {
+      id,
+      title: opts.text ? opts.text.slice(0, 80) : 'Nova sessão',
+      source: 'cli',
+      cwd,
+      projectPath: cwd,
+      projectName: cwd.split('/').pop() || cwd,
+      messageCount: 0,
+      createdAt: Date.now(),
+      lastActivityAt: Date.now(),
+      archived: false,
+      live: false,
+      filePath: ''
+    }
+    setPending((p) => new Map(p).set(id, session))
     setSelectedId(id)
     setTab('chat')
+    if (opts.text) await sendChat(session, opts.text)
   }
+
+  /** Envia uma mensagem para o chat de uma sessão (usado pela busca rápida). */
+  async function sendChat(s: SessionInfo, text: string): Promise<void> {
+    const slot = chatStore.get(s.id)
+    await window.jarvis.chatSend({
+      key: s.id,
+      cwd: s.cwd || s.projectPath,
+      text,
+      resumeId: s.filePath ? s.id : undefined,
+      newSessionId: s.filePath ? undefined : s.id,
+      permissionMode: slot.permissionMode,
+      model: slot.model
+    })
+  }
+
+  // Pedidos vindos da busca rápida, da barra de menu e das notificações.
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
+  const allRef = useRef(all)
+  allRef.current = all
+  const navRef = useRef<(req: NavRequest) => Promise<void>>(async () => {})
+  navRef.current = async (req) => {
+    switch (req.type) {
+      case 'show':
+        return
+      case 'workspace':
+        setQuery('')
+        setView({ kind: 'ws', id: req.id })
+        return
+      case 'new':
+        if (req.workspaceId) setView({ kind: 'ws', id: req.workspaceId })
+        await newSession({ cwd: req.cwd, workspaceId: req.workspaceId, text: req.text })
+        return
+      case 'session': {
+        let s = allRef.current.find((x) => x.id === req.id)
+        if (!s) s = (await window.jarvis.listSessions()).find((x) => x.id === req.id)
+        if (!s) return
+        if (!visibleRef.current.some((x) => x.id === req.id)) {
+          setQuery('')
+          setView({ kind: 'all' })
+          if (s.archived) setShowArchived(true)
+        }
+        select(req.id)
+        if (req.send) {
+          if (terminals.has(req.id)) return
+          setTab('chat')
+          await sendChat(s, req.send)
+        }
+      }
+    }
+  }
+  useEffect(() => window.jarvis.onNav((req) => void navRef.current(req)), [])
 
   async function assign(wsId: string, sessionId: string, assigned: boolean): Promise<void> {
     setWorkspaces(await window.jarvis.assignSession(wsId, sessionId, assigned))

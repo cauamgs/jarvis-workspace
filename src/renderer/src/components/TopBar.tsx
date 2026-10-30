@@ -18,6 +18,9 @@ export function TopBar({ total, live, terminals, workspaces }: Props): React.JSX
       <div className="brand">
         J.A.R.V.I.S.<small>WORKSPACE</small>
       </div>
+      <button className="btn ghost sm search-btn" onClick={() => window.jarvis.showPalette()} title="Busca rápida">
+        ⌕ Busca rápida <span>{window.jarvis.shortcutLabel}</span>
+      </button>
       <div className="spacer" />
       <Stat label="Workspaces" value={workspaces} />
       <Stat label="Sessões" value={total} />

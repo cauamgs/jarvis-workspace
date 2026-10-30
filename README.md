@@ -33,4 +33,12 @@ Gera o `.app` (Apple Silicon), assina ad-hoc e instala em `/Applications/Jarvis 
   reservado (`sessionId`); pedidos de permissão viram cartões na interface. O processo fecha após 20 min ocioso.
 - **Terminal** (`src/main/pty.ts`) roda `claude --resume <id>` (ou `--session-id` para sessões novas) num PTY.
 
+- **Busca rápida** (`src/main/palette.ts`, `src/renderer/src/Palette.tsx`): atalho global **⇧⌘J**
+  (⌥⇧⌘J na versão de desenvolvimento) abre um painel flutuante por cima de qualquer app — buscar e abrir
+  sessões, ⌘↵ envia o texto digitado para a sessão, ou "Nova sessão em …" cria uma sessão já com o pedido.
+- **Barra de menu** (`src/main/tray.ts`): sessões que precisam de você, em execução e recentes, workspaces,
+  "Iniciar com o macOS". Fechar a janela só a esconde — chats e terminais continuam rodando.
+- **Notificações**: pedido de permissão ou turno concluído com o Jarvis fora de foco geram notificação;
+  permissões pendentes aparecem como contador na barra de menu e no Dock.
+
 Os formatos do Claude são internos e podem mudar — o Jarvis nunca escreve neles.

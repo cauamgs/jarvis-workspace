@@ -81,6 +81,13 @@ export interface ChatSendOptions {
   model?: string
 }
 
+/** Pedidos de navegação para a janela principal (vindos da busca rápida, barra de menu ou notificações). */
+export type NavRequest =
+  | { type: 'show' }
+  | { type: 'session'; id: string; send?: string }
+  | { type: 'workspace'; id: string }
+  | { type: 'new'; cwd: string; workspaceId?: string; text?: string }
+
 export interface JarvisApi {
   listSessions(): Promise<SessionInfo[]>
   getTranscript(sessionId: string): Promise<TranscriptMessage[]>
@@ -113,6 +120,15 @@ export interface JarvisApi {
   chatActive(): Promise<string[]>
   chatInfo(key: string): Promise<{ init?: ChatEvent; running: boolean } | null>
   onChatEvent(cb: (key: string, ev: ChatEvent) => void): () => void
+
+  /** Janela principal: recebe pedidos de navegação. */
+  onNav(cb: (req: NavRequest) => void): () => void
+  /** Busca rápida: pede navegação na janela principal (e se esconde). */
+  navigate(req: NavRequest): void
+  hidePalette(): void
+  showPalette(): void
+  onPaletteShown(cb: () => void): () => void
+  shortcutLabel: string
 
   pickDirectory(): Promise<string | null>
   openInFinder(path: string): void

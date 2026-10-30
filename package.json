@@ -69,7 +69,16 @@
       "category": "public.app-category.developer-tools",
       "identity": null,
       "darkModeSupport": true
-    }
+    },
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": ".",
+        "filter": [
+          "*.png"
+        ]
+      }
+    ]
   },
   "author": "cauamgs"
 }
