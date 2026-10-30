@@ -94,6 +94,14 @@ function registerIpc(): void {
   ipcMain.on('sys:openInFinder', (_e, p: string) => shell.openPath(p))
 }
 
+// Abrir o app de novo só traz a janela existente para frente.
+if (!app.requestSingleInstanceLock()) app.quit()
+app.on('second-instance', () => {
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.focus()
+})
+
 app.whenReady().then(async () => {
   app.setName('Jarvis WorkSpace')
   await Promise.all([indexer.load(), store.load()])

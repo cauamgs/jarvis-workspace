@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="70%">
+      <stop offset="0%" stop-color="#0a3550"/>
+      <stop offset="55%" stop-color="#041624"/>
+      <stop offset="100%" stop-color="#01070d"/>
+    </radialGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="30%" stop-color="#b5fbff"/>
+      <stop offset="65%" stop-color="#00e5ff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" fill="none" stroke="#00e5ff" stroke-opacity="0.07" stroke-width="2"/>
+    </pattern>
+    <clipPath id="sq"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+  </defs>
+  <g clip-path="url(#sq)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#bg)"/>
+    <rect x="100" y="100" width="824" height="824" fill="url(#grid)"/>
+  </g>
+  <rect x="102" y="102" width="820" height="820" rx="183" fill="none" stroke="#00e5ff" stroke-opacity="0.35" stroke-width="4"/>
+  <g transform="translate(512 512)" fill="none" stroke="#00e5ff" filter="url(#glow)">
+    <g id="ticks">
+    </g>
+    <circle r="300" stroke-width="5" stroke-opacity="0.45"/>
+    <circle r="268" stroke-width="22" stroke-dasharray="118 46" stroke-opacity="0.9"/>
+    <circle r="205" stroke-width="7" stroke-dasharray="26 22" stroke-opacity="0.85"/>
+    <circle r="150" stroke-width="12"/>
+    <polygon points="0,-108 94,54 -94,54" stroke-width="12" stroke-linejoin="round"/>
+  </g>
+  <circle cx="512" cy="512" r="140" fill="url(#core)"/>
+</svg>

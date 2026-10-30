@@ -10,6 +10,14 @@ npm install
 npm run dev
 ```
 
+## Instalar como app
+
+```bash
+npm run install:app
+```
+
+Gera o `.app` (Apple Silicon), assina ad-hoc e instala em `/Applications/Jarvis WorkSpace.app`.
+
 ## Como funciona
 
 - **Indexador** (`src/main/indexer.ts`) lê, somente leitura:
