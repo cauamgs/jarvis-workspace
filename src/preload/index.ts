@@ -50,6 +50,12 @@ const api: JarvisApi = {
   showPalette: () => ipcRenderer.send('palette:show'),
   onPaletteShown: (cb) => subscribe('palette:shown', cb),
   shortcutLabel: ipcRenderer.sendSync('sys:shortcutLabel'),
+  voiceShortcutLabel: ipcRenderer.sendSync('sys:voiceShortcutLabel'),
+  voiceStart: () => ipcRenderer.invoke('voice:start'),
+  voiceStop: () => ipcRenderer.send('voice:stop'),
+  voiceCancel: () => ipcRenderer.send('voice:cancel'),
+  onVoiceEvent: (cb) => subscribe('voice:event', cb),
+  onPaletteVoice: (cb) => subscribe('palette:voice', cb),
 
   sysSnapshot: () => ipcRenderer.invoke('sys:snapshot'),
   sysPorts: () => ipcRenderer.invoke('sys:ports'),

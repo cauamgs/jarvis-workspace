@@ -45,6 +45,9 @@ export function Composer({ sessionKey: key, showDetails, onToggleDetails, onSend
   const [images, setImages] = useState<ChatImage[]>([])
   const [cmdIndex, setCmdIndex] = useState(0)
   const [mcpOpen, setMcpOpen] = useState(false)
+  const [dictating, setDictating] = useState(false)
+  const dictateBase = useRef('')
+  const dictatingRef = useRef(false)
   const input = useRef<HTMLTextAreaElement>(null)
   const busy = chat.state === 'running' || chat.state === 'starting'
   const active = chatStore.active().has(key)
@@ -54,6 +57,34 @@ export function Composer({ sessionKey: key, showDetails, onToggleDetails, onSend
     setImages([])
     input.current?.focus()
   }, [key])
+
+  // Ditado: o texto falado entra na caixa (sem enviar sozinho).
+  useEffect(
+    () =>
+      window.jarvis.onVoiceEvent((ev) => {
+        if (!dictatingRef.current) return
+        if (ev.type === 'partial' || ev.type === 'final') setText((dictateBase.current + ' ' + ev.text).trim())
+        if (ev.type === 'state' && !ev.listening) {
+          dictatingRef.current = false
+          setDictating(false)
+          input.current?.focus()
+        }
+      }),
+    []
+  )
+
+  async function toggleDictation(): Promise<void> {
+    if (dictating) return window.jarvis.voiceStop()
+    dictateBase.current = text
+    dictatingRef.current = true
+    setDictating(true)
+    const r = await window.jarvis.voiceStart()
+    if (!r.ok) {
+      dictatingRef.current = false
+      setDictating(false)
+      alert(r.error)
+    }
+  }
 
   // Arrastar imagens para qualquer lugar do chat chega aqui via evento.
   useEffect(() => {
@@ -188,6 +219,13 @@ export function Composer({ sessionKey: key, showDetails, onToggleDetails, onSend
           }}
         >
           ⊕
+        </button>
+        <button
+          className={`icon-btn${dictating ? ' rec' : ''}`}
+          title={dictating ? 'Parar ditado' : 'Ditar (voz)'}
+          onClick={() => void toggleDictation()}
+        >
+          {dictating ? '■' : '🎙'}
         </button>
         <select
           className="select"

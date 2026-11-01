@@ -13,7 +13,8 @@
     "postinstall": "electron-rebuild -f -w node-pty",
     "dist": "electron-vite build && electron-builder --mac --arm64",
     "icon": "electron scripts/render-icon.cjs",
-    "install:app": "./scripts/install-app.sh"
+    "install:app": "./scripts/install-app.sh",
+    "build:native": "swiftc -O native/speech.swift -o resources/bin/jarvis-speech"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.2.1",
@@ -68,14 +69,19 @@
       "icon": "build/icon.png",
       "category": "public.app-category.developer-tools",
       "identity": null,
-      "darkModeSupport": true
+      "darkModeSupport": true,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "O Jarvis usa o microfone para os comandos por voz.",
+        "NSSpeechRecognitionUsageDescription": "O Jarvis transcreve sua voz no próprio Mac para executar comandos e ditar mensagens."
+      }
     },
     "extraResources": [
       {
         "from": "resources",
         "to": ".",
         "filter": [
-          "*.png"
+          "*.png",
+          "bin/*"
         ]
       }
     ]

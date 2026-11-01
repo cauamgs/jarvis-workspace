@@ -8,6 +8,7 @@ import { PtyManager } from './pty'
 import { WorkspaceStore } from './store'
 import * as system from './system'
 import * as projects from './projects'
+import { Voice } from './voice'
 import { JarvisTray } from './tray'
 import type {
   ChatEvent,
@@ -27,6 +28,8 @@ let quitting = false
 if (!app.isPackaged) app.setPath('userData', app.getPath('userData') + ' (dev)')
 const SHORTCUT = app.isPackaged ? 'CommandOrControl+Shift+J' : 'CommandOrControl+Alt+Shift+J'
 const SHORTCUT_LABEL = app.isPackaged ? '⇧⌘J' : '⌥⇧⌘J'
+const VOICE_SHORTCUT = app.isPackaged ? 'CommandOrControl+Alt+J' : 'CommandOrControl+Alt+Control+J'
+const VOICE_SHORTCUT_LABEL = app.isPackaged ? '⌥⌘J' : '⌃⌥⌘J'
 let shortcutOk = false
 
 const userData = app.getPath('userData')
@@ -53,6 +56,11 @@ const tray = new JarvisTray({
   nav
 })
 const watchers: FSWatcher[] = []
+// Eventos de voz vão para as duas janelas: a busca rápida e o chat (ditado) usam a mesma escuta.
+const voice = new Voice((ev) => {
+  win?.webContents.send('voice:event', ev)
+  palette.send('voice:event', ev)
+})
 
 /** Último índice conhecido — alimenta a barra de menu e os títulos das notificações. */
 let sessions: SessionInfo[] = []
@@ -267,6 +275,10 @@ function registerIpc(): void {
   ipcMain.on('palette:hide', () => palette.hide())
   ipcMain.on('palette:show', () => palette.show())
   ipcMain.on('sys:shortcutLabel', (e) => (e.returnValue = SHORTCUT_LABEL))
+  ipcMain.on('sys:voiceShortcutLabel', (e) => (e.returnValue = VOICE_SHORTCUT_LABEL))
+  ipcMain.handle('voice:start', () => voice.start())
+  ipcMain.on('voice:stop', () => voice.stop())
+  ipcMain.on('voice:cancel', () => voice.cancel())
 
   ipcMain.handle('sys:snapshot', () => system.snapshot())
   ipcMain.handle('sys:ports', () => system.listeningPorts())
@@ -314,6 +326,8 @@ app.whenReady().then(async () => {
   void app.dock?.show()
   tray.create()
   shortcutOk = globalShortcut.register(SHORTCUT, () => palette.toggle())
+  // Atalho de voz: abre a busca rápida ouvindo; um segundo toque encerra a escuta.
+  globalShortcut.register(VOICE_SHORTCUT, () => (voice.listening ? voice.stop() : palette.showVoice()))
   if (!shortcutOk) console.warn(`Atalho ${SHORTCUT} indisponível (em uso por outro app).`)
   watchSessions()
   void refreshSessions()

@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { NavRequest, SessionInfo, Workspace } from '@shared/types'
 import { ArcReactor } from './components/ArcReactor'
 import { inWorkspace, timeAgo } from './lib'
+import { cleanUtterance, parseCommand, speak } from './voice'
 
 type Item =
   | { kind: 'open' }
+  | { kind: 'cmd'; req: NavRequest; say: string }
   | { kind: 'session'; s: SessionInfo; running: boolean }
   | { kind: 'ws'; ws: Workspace }
   | { kind: 'new'; label: string; cwd: string; workspaceId?: string; color?: string }
@@ -23,6 +25,15 @@ export function Palette(): React.JSX.Element {
   const [index, setIndex] = useState(0)
   const input = useRef<HTMLInputElement>(null)
   const list = useRef<HTMLDivElement>(null)
+  // Voz: escutando, nível do microfone, erro, e se o texto atual veio de voz (resposta será falada).
+  const [listening, setListening] = useState(false)
+  const [level, setLevel] = useState(0)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [fromVoice, setFromVoice] = useState(false)
+  /** Só processa a escuta que a própria busca iniciou (o ditado do chat usa o mesmo microfone). */
+  const ownsVoice = useRef(false)
+  const dataRef = useRef({ sessions, workspaces })
+  dataRef.current = { sessions, workspaces }
 
   async function refresh(): Promise<void> {
     const [s, w, a] = await Promise.all([
@@ -35,14 +46,58 @@ export function Palette(): React.JSX.Element {
     setActive(new Set(a))
   }
 
+  async function startVoice(): Promise<void> {
+    setVoiceError(null)
+    setQuery('')
+    ownsVoice.current = true
+    const r = await window.jarvis.voiceStart()
+    if (!r.ok) {
+      ownsVoice.current = false
+      setVoiceError(r.error ?? 'Falha ao iniciar a escuta')
+    }
+  }
+
   useEffect(() => {
     void refresh()
-    return window.jarvis.onPaletteShown(() => {
+    const offShown = window.jarvis.onPaletteShown(() => {
       setQuery('')
       setIndex(0)
+      setFromVoice(false)
+      setVoiceError(null)
       void refresh()
       requestAnimationFrame(() => input.current?.focus())
     })
+    const offVoiceOpen = window.jarvis.onPaletteVoice(() => void startVoice())
+    const offVoice = window.jarvis.onVoiceEvent((ev) => {
+      if (!ownsVoice.current) return
+      if (ev.type === 'state') {
+        setListening(ev.listening)
+        if (!ev.listening) {
+          setLevel(0)
+          ownsVoice.current = false
+        }
+      } else if (ev.type === 'level') setLevel(ev.value)
+      else if (ev.type === 'partial') {
+        setQuery(ev.text)
+        setFromVoice(true)
+      } else if (ev.type === 'final') {
+        const text = cleanUtterance(ev.text)
+        setQuery(text)
+        setFromVoice(true)
+        // Comandos locais executam na hora; pedidos para o Claude esperam confirmação (Enter).
+        const cmd = text && parseCommand(text, dataRef.current.sessions, dataRef.current.workspaces)
+        if (cmd) {
+          speak(cmd.say)
+          window.jarvis.navigate(cmd.req)
+        }
+        requestAnimationFrame(() => input.current?.focus())
+      } else if (ev.type === 'error') setVoiceError(ev.message)
+    })
+    return () => {
+      offShown()
+      offVoiceOpen()
+      offVoice()
+    }
   }, [])
 
   const groups = useMemo<Group[]>(() => {
@@ -88,7 +143,9 @@ export function Palette(): React.JSX.Element {
       targets.push({ kind: 'new', label: s.projectName, cwd: s.projectPath })
     }
 
+    const cmd = parseCommand(query, sessions, workspaces)
     return [
+      ...(cmd ? [{ title: 'COMANDO', items: [{ kind: 'cmd', req: cmd.req, say: cmd.say } as Item] }] : []),
       { title: 'SESSÕES', items: found.map(toItem) },
       { title: 'WORKSPACES', items: workspaces.filter((w) => matches(w.name.toLowerCase())).map((ws) => ({ kind: 'ws', ws }) as Item) },
       { title: 'NOVA SESSÃO COM ESTE PEDIDO', items: targets }
@@ -111,14 +168,17 @@ export function Palette(): React.JSX.Element {
       case 'open':
         req = { type: 'show' }
         break
+      case 'cmd':
+        req = item.req
+        break
       case 'session':
-        req = { type: 'session', id: item.s.id, send: sendText && text ? text : undefined }
+        req = { type: 'session', id: item.s.id, send: sendText && text ? text : undefined, voice: fromVoice }
         break
       case 'ws':
         req = { type: 'workspace', id: item.ws.id }
         break
       case 'new':
-        req = { type: 'new', cwd: item.cwd, workspaceId: item.workspaceId, text: text || undefined }
+        req = { type: 'new', cwd: item.cwd, workspaceId: item.workspaceId, text: text || undefined, voice: fromVoice }
         break
     }
     window.jarvis.navigate(req)
@@ -136,7 +196,8 @@ export function Palette(): React.JSX.Element {
       run(current, e.metaKey)
     } else if (e.key === 'Escape') {
       e.preventDefault()
-      if (query) setQuery('')
+      if (listening) window.jarvis.voiceCancel()
+      else if (query) setQuery('')
       else window.jarvis.hidePalette()
     }
   }
@@ -145,18 +206,46 @@ export function Palette(): React.JSX.Element {
   return (
     <div className="palette-root" onMouseDown={(e) => e.target === e.currentTarget && window.jarvis.hidePalette()}>
       <div className="panel palette">
-        <div className="p-input">
-          <ArcReactor size={34} />
+        <div className={`p-input${listening ? ' listening' : ''}`}>
+          <div className="p-reactor" style={{ transform: `scale(${1 + level * 0.35})` }}>
+            <ArcReactor size={34} />
+          </div>
           <input
             ref={input}
             autoFocus
             value={query}
             placeholder="Às suas ordens. Buscar sessão ou descrever uma tarefa…"
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setFromVoice(false)
+            }}
             onKeyDown={onKey}
           />
+          <button
+            className={`p-mic${listening ? ' on' : ''}`}
+            title={`Falar com o Jarvis (${window.jarvis.voiceShortcutLabel})`}
+            onClick={() => (listening ? window.jarvis.voiceStop() : void startVoice())}
+          >
+            🎙
+          </button>
           <span className="p-shortcut">{window.jarvis.shortcutLabel}</span>
         </div>
+        {(listening || voiceError) && (
+          <div className={`p-voice${voiceError ? ' err' : ''}`}>
+            {voiceError ? (
+              <>✕ {voiceError}</>
+            ) : (
+              <>
+                <span className="p-wave">
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <i key={i} style={{ height: `${4 + Math.abs(Math.sin(i * 1.7 + level * 9)) * level * 26}px` }} />
+                  ))}
+                </span>
+                OUVINDO… <small>fale e pause para terminar · {window.jarvis.voiceShortcutLabel} encerra</small>
+              </>
+            )}
+          </div>
+        )}
         <div className="p-list" ref={list}>
           {groups.map((g) => (
             <div key={g.title}>
@@ -192,6 +281,14 @@ export function Palette(): React.JSX.Element {
 
 function ItemView({ item, hasText }: { item: Item; hasText: boolean }): React.JSX.Element {
   switch (item.kind) {
+    case 'cmd':
+      return (
+        <>
+          <span className="p-glyph">⚡</span>
+          <span className="p-title">{item.say.replace(/\.$/, '')}</span>
+          <span className="p-meta">comando</span>
+        </>
+      )
     case 'open':
       return (
         <>

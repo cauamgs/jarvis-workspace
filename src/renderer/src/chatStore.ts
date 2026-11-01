@@ -11,6 +11,7 @@ import type {
   SlashCommandInfo,
   TranscriptMessage
 } from '@shared/types'
+import { speak } from './voice'
 
 export interface ChatSlot {
   state: ChatState
@@ -72,6 +73,12 @@ class ChatStore {
   /** Substituído (nunca mutado) a cada mudança, para o React perceber. */
   private activeKeys = new Set<string>()
   global: ChatGlobal = { commands: read<SlashCommandInfo[]>(COMMANDS_KEY, []) }
+  /** Sessões cujo próximo resultado deve ser lido em voz alta (pedido feito por voz). */
+  private speakNext = new Set<string>()
+
+  markSpeak(key: string): void {
+    this.speakNext.add(key)
+  }
 
   constructor() {
     window.jarvis.onChatEvent((key, ev) => this.apply(key, ev))
@@ -185,6 +192,11 @@ class ChatStore {
         break
       case 'result':
         this.update(key, { lastResult: ev, draft: null })
+        if (this.speakNext.delete(key)) {
+          const last = [...s.live].reverse().find((m) => m.role === 'assistant' && m.blocks.some((b) => b.kind === 'text'))
+          const text = last?.blocks.flatMap((b) => (b.kind === 'text' ? [b.text] : [])).join(' ')
+          if (text) speak(ev.isError ? 'Houve um erro ao executar o pedido.' : text)
+        }
         break
       case 'subagent': {
         const prev = s.subagents[ev.parentId] ?? []

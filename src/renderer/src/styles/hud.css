@@ -1334,3 +1334,34 @@ tr:hover .row-btn, .ctr:hover .row-btn, .row-btn.armed { opacity: 1; }
 .diff.patch > div { padding: 0 14px; }
 .diff .meta { color: var(--text-faint); }
 .diff .hunk { color: var(--cyan); background: rgba(0, 229, 255, 0.06); }
+
+/* ---------- voz ---------- */
+.p-reactor { transition: transform 0.08s linear; display: flex; }
+.p-input.listening { background: linear-gradient(90deg, rgba(0, 229, 255, 0.1), transparent); }
+.p-mic {
+  background: none;
+  border: 1px solid var(--cyan-line);
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  cursor: pointer;
+  filter: grayscale(1) brightness(1.6);
+}
+.p-mic:hover { border-color: var(--cyan-dim); }
+.p-mic.on { border-color: var(--red); background: rgba(255, 59, 92, 0.15); filter: none; animation: pulse 1.2s steps(6) infinite; }
+.p-voice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--cyan-line);
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: var(--cyan);
+}
+.p-voice small { font-family: var(--font-mono); letter-spacing: 0.06em; color: var(--text-faint); font-size: 10px; }
+.p-voice.err { color: #ff8ea1; font-family: var(--font-body); letter-spacing: 0; font-size: 13px; font-weight: 600; }
+.p-wave { display: flex; align-items: center; gap: 2px; height: 30px; }
+.p-wave i { width: 3px; background: var(--cyan); box-shadow: 0 0 6px rgba(0, 229, 255, 0.6); transition: height 0.08s linear; }
+.icon-btn.rec { color: var(--red); border-color: var(--red); background: rgba(255, 59, 92, 0.12); }

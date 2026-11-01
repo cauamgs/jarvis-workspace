@@ -258,12 +258,23 @@ export interface ProjectDetail {
   branches: { name: string; date: number; track?: string }[]
 }
 
+// ---------- voz ----------
+
+export type VoiceEvent =
+  | { type: 'state'; listening: boolean }
+  | { type: 'ready' }
+  | { type: 'level'; value: number }
+  | { type: 'partial'; text: string }
+  | { type: 'final'; text: string }
+  | { type: 'error'; message: string }
+
 /** Pedidos de navegação para a janela principal (vindos da busca rápida, barra de menu ou notificações). */
 export type NavRequest =
   | { type: 'show' }
-  | { type: 'session'; id: string; send?: string }
+  | { type: 'session'; id: string; send?: string; voice?: boolean }
   | { type: 'workspace'; id: string }
-  | { type: 'new'; cwd: string; workspaceId?: string; text?: string }
+  | { type: 'new'; cwd: string; workspaceId?: string; text?: string; voice?: boolean }
+  | { type: 'module'; id: 'sessions' | 'system' | 'projects' }
   | { type: 'project'; path: string }
 
 export interface JarvisApi {
@@ -321,6 +332,13 @@ export interface JarvisApi {
   showPalette(): void
   onPaletteShown(cb: () => void): () => void
   shortcutLabel: string
+  voiceShortcutLabel: string
+  voiceStart(): Promise<{ ok: boolean; error?: string }>
+  voiceStop(): void
+  voiceCancel(): void
+  onVoiceEvent(cb: (ev: VoiceEvent) => void): () => void
+  /** Busca rápida: aberta pelo atalho de voz (já começa ouvindo). */
+  onPaletteVoice(cb: () => void): () => void
 
   sysSnapshot(): Promise<SystemSnapshot>
   sysPorts(): Promise<ListeningPort[]>

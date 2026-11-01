@@ -52,6 +52,16 @@ export class Palette {
     else this.show()
   }
 
+  /** Abre já ouvindo (atalho de voz). */
+  showVoice(): void {
+    this.show()
+    this.win?.webContents.send('palette:voice')
+  }
+
+  get visible(): boolean {
+    return !!this.win?.isVisible()
+  }
+
   show(): void {
     if (!this.win) this.create()
     const win = this.win!
@@ -64,6 +74,10 @@ export class Palette {
     win.webContents.send('palette:shown')
     win.show()
     win.focus()
+  }
+
+  send(channel: string, ...args: unknown[]): void {
+    this.win?.webContents.send(channel, ...args)
   }
 
   hide(): void {

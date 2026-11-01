@@ -5,6 +5,7 @@ set -euo pipefail
 cd "${0:A:h}/.."
 
 unset ELECTRON_RUN_AS_NODE
+npm run build:native
 npx electron-vite build
 npx electron-builder --mac --arm64
 

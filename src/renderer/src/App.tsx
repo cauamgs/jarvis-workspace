@@ -135,7 +135,7 @@ export default function App(): React.JSX.Element {
     void reload()
   }
 
-  async function newSession(opts: { cwd?: string; workspaceId?: string; text?: string } = {}): Promise<void> {
+  async function newSession(opts: { cwd?: string; workspaceId?: string; text?: string; voice?: boolean } = {}): Promise<void> {
     const wsId = opts.workspaceId ?? currentWs?.id
     const cwd =
       opts.cwd ??
@@ -160,12 +160,13 @@ export default function App(): React.JSX.Element {
     setPending((p) => new Map(p).set(id, session))
     setSelectedId(id)
     setTab('chat')
-    if (opts.text) await sendChat(session, opts.text)
+    if (opts.text) await sendChat(session, opts.text, opts.voice)
   }
 
   /** Envia uma mensagem para o chat de uma sessão (usado pela busca rápida). */
-  async function sendChat(s: SessionInfo, text: string): Promise<void> {
+  async function sendChat(s: SessionInfo, text: string, voice?: boolean): Promise<void> {
     const slot = chatStore.get(s.id)
+    if (voice) chatStore.markSpeak(s.id)
     await window.jarvis.chatSend({
       key: s.id,
       cwd: s.cwd || s.projectPath,
@@ -191,6 +192,9 @@ export default function App(): React.JSX.Element {
         setProjectFocus(req.path)
         setModule('projects')
         return
+      case 'module':
+        setModule(req.id)
+        return
       case 'workspace':
         setModule('sessions')
         setQuery('')
@@ -199,7 +203,7 @@ export default function App(): React.JSX.Element {
       case 'new':
         setModule('sessions')
         if (req.workspaceId) setView({ kind: 'ws', id: req.workspaceId })
-        await newSession({ cwd: req.cwd, workspaceId: req.workspaceId, text: req.text })
+        await newSession({ cwd: req.cwd, workspaceId: req.workspaceId, text: req.text, voice: req.voice })
         return
       case 'session': {
         setModule('sessions')
@@ -215,7 +219,7 @@ export default function App(): React.JSX.Element {
         if (req.send) {
           if (terminals.has(req.id)) return
           setTab('chat')
-          await sendChat(s, req.send)
+          await sendChat(s, req.send, req.voice)
         }
       }
     }
