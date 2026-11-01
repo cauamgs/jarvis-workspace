@@ -222,12 +222,49 @@ export interface DockerState {
   error?: string
 }
 
+// ---------- central de projetos ----------
+
+export interface CommitInfo {
+  hash: string
+  subject: string
+  author: string
+  date: number
+  refs?: string
+}
+
+export interface ProjectInfo {
+  path: string
+  name: string
+  branch: string
+  upstream?: string
+  ahead: number
+  behind: number
+  staged: number
+  unstaged: number
+  untracked: number
+  conflicts: number
+  stashes: number
+  worktrees: number
+  lastCommit?: CommitInfo
+  remote?: string
+  web?: string
+  provider?: 'github' | 'gitlab' | 'other'
+  error?: string
+}
+
+export interface ProjectDetail {
+  files: { code: string; path: string }[]
+  commits: CommitInfo[]
+  branches: { name: string; date: number; track?: string }[]
+}
+
 /** Pedidos de navegação para a janela principal (vindos da busca rápida, barra de menu ou notificações). */
 export type NavRequest =
   | { type: 'show' }
   | { type: 'session'; id: string; send?: string }
   | { type: 'workspace'; id: string }
   | { type: 'new'; cwd: string; workspaceId?: string; text?: string }
+  | { type: 'project'; path: string }
 
 export interface JarvisApi {
   listSessions(): Promise<SessionInfo[]>
@@ -294,6 +331,14 @@ export interface JarvisApi {
   sysDockerLogs(id: string): Promise<string>
   sysStartDocker(): Promise<{ ok: boolean; error?: string }>
   openExternal(url: string): void
+
+  projList(): Promise<ProjectInfo[]>
+  projDetail(path: string): Promise<ProjectDetail>
+  projFileDiff(path: string, file: string, code: string): Promise<string>
+  projCommitDiff(path: string, hash: string): Promise<string>
+  projAction(path: string, action: 'fetch' | 'pull'): Promise<{ ok: boolean; out: string }>
+  projCheckout(path: string, branch: string): Promise<{ ok: boolean; out: string }>
+  projOpen(path: string, app: 'finder' | 'terminal' | 'vscode'): void
 
   pickDirectory(): Promise<string | null>
   openInFinder(path: string): void

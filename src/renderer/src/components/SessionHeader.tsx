@@ -12,6 +12,7 @@ interface Props {
   onCloseChat: () => void
   onRename: (title: string) => void
   onFork: () => void
+  onOpenProject: () => void
   onToggleWorkspace: (wsId: string, assigned: boolean) => void
 }
 
@@ -103,6 +104,9 @@ export function SessionHeader({ session: s, workspaces, ...p }: Props): React.JS
             </div>
           )}
         </div>
+        <button className="btn ghost" onClick={p.onOpenProject} title="Ver o repositório na Central de projetos">
+          ⎇ Projeto
+        </button>
         {s.filePath && (
           <button className="btn ghost" onClick={p.onFork} title="Nova sessão com uma cópia de toda a conversa">
             ⑂ Ramificar

@@ -7,6 +7,7 @@ import { Palette } from './palette'
 import { PtyManager } from './pty'
 import { WorkspaceStore } from './store'
 import * as system from './system'
+import * as projects from './projects'
 import { JarvisTray } from './tray'
 import type {
   ChatEvent,
@@ -278,6 +279,18 @@ function registerIpc(): void {
   ipcMain.on('sys:openExternal', (_e, url: string) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
   })
+
+  // Projetos: repositórios das raízes padrão + pastas das sessões + pastas vinculadas aos workspaces.
+  ipcMain.handle('proj:list', async () => {
+    const extra = [...new Set([...sessions.map((s) => s.projectPath), ...store.list().flatMap((w) => w.autoPaths)])]
+    return projects.listProjects(await projects.discoverRepos(projects.DEFAULT_ROOTS, extra))
+  })
+  ipcMain.handle('proj:detail', (_e, p: string) => projects.projectDetail(p))
+  ipcMain.handle('proj:fileDiff', (_e, p: string, f: string, c: string) => projects.fileDiff(p, f, c))
+  ipcMain.handle('proj:commitDiff', (_e, p: string, h: string) => projects.commitDiff(p, h))
+  ipcMain.handle('proj:action', (_e, p: string, a: 'fetch' | 'pull') => projects.gitAction(p, a))
+  ipcMain.handle('proj:checkout', (_e, p: string, b: string) => projects.checkout(p, b))
+  ipcMain.on('proj:open', (_e, p: string, app: 'finder' | 'terminal' | 'vscode') => projects.openWith(p, app))
 
   ipcMain.handle('sys:pickDirectory', async () => {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] })

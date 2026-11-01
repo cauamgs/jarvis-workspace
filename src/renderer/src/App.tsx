@@ -12,6 +12,7 @@ import { WorkspaceModal } from './components/WorkspaceModal'
 import { chatStore, useActiveChats } from './chatStore'
 import { ModuleRail, type ModuleId } from './components/ModuleRail'
 import { SystemView } from './components/system/SystemView'
+import { ProjectsView } from './components/projects/ProjectsView'
 import { inWorkspace, uuid } from './lib'
 
 interface TermSpec {
@@ -36,6 +37,7 @@ export default function App(): React.JSX.Element {
   const [modal, setModal] = useState<{ ws?: Workspace } | null>(null)
   const [liveWarn, setLiveWarn] = useState<string | null>(null)
   const [module, setModule] = useState<ModuleId>('sessions')
+  const [projectFocus, setProjectFocus] = useState<string | undefined>()
   const activeChats = useActiveChats()
   /** Sessões com algo rodando dentro do Jarvis (terminal ou chat). */
   const inJarvis = useMemo(() => new Set([...terminals.keys(), ...activeChats]), [terminals, activeChats])
@@ -185,6 +187,10 @@ export default function App(): React.JSX.Element {
     switch (req.type) {
       case 'show':
         return
+      case 'project':
+        setProjectFocus(req.path)
+        setModule('projects')
+        return
       case 'workspace':
         setModule('sessions')
         setQuery('')
@@ -230,6 +236,7 @@ export default function App(): React.JSX.Element {
         <div className="shell">
           <ModuleRail active={module} onChange={setModule} />
           {module === 'system' && <SystemView />}
+          {module === 'projects' && <ProjectsView focusPath={projectFocus} onNavigate={(req) => void navRef.current(req)} />}
         <div className="main" style={module === 'sessions' ? undefined : { display: 'none' }}>
           <Sidebar
             view={view}
@@ -264,6 +271,7 @@ export default function App(): React.JSX.Element {
                   onOpenTerminal={() => openTerminal(selected)}
                   onCloseTerminal={() => closeTerminal(selected.id)}
                   onCloseChat={() => void window.jarvis.chatClose(selected.id)}
+                  onOpenProject={() => void navRef.current({ type: 'project', path: selected.projectPath })}
                   onRename={(title) => void window.jarvis.renameSession(selected.id, title).then(reload)}
                   onFork={async () => {
                     const r = await window.jarvis.forkSession(selected.id)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Overlay } from '../Overlay'
 import type { ContainerInfo, DockerState, ListeningPort, ProcessInfo, SystemSnapshot } from '@shared/types'
 import { fmtBytes, fmtRate, levelOf, RingGauge, Sparkline } from './Gauges'
 
@@ -319,7 +320,7 @@ function DockerPanel({
         ))}
       </div>
       {logs && (
-        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setLogs(null)}>
+        <Overlay onClose={() => setLogs(null)}>
           <div className="panel modal logs-modal">
             <div className="panel-header">
               Logs · {logs.name}
@@ -327,7 +328,7 @@ function DockerPanel({
             </div>
             <pre className="logs-body">{logs.text || '(sem logs)'}</pre>
           </div>
-        </div>
+        </Overlay>
       )}
     </section>
   )

@@ -1,9 +1,9 @@
-export type ModuleId = 'sessions' | 'system'
+export type ModuleId = 'sessions' | 'system' | 'projects'
 
 const MODULES: { id: ModuleId | 'projects'; icon: string; label: string; soon?: boolean }[] = [
   { id: 'sessions', icon: '◈', label: 'Sessões' },
   { id: 'system', icon: '◔', label: 'Sistema' },
-  { id: 'projects', icon: '⎇', label: 'Projetos', soon: true }
+  { id: 'projects', icon: '⎇', label: 'Projetos' }
 ]
 
 /** Barra vertical de módulos do Jarvis — cada ferramenta nova ganha um ícone aqui. */

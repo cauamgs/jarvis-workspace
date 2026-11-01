@@ -60,6 +60,13 @@ const api: JarvisApi = {
   sysDockerLogs: (id) => ipcRenderer.invoke('sys:dockerLogs', id),
   sysStartDocker: () => ipcRenderer.invoke('sys:startDocker'),
   openExternal: (url) => ipcRenderer.send('sys:openExternal', url),
+  projList: () => ipcRenderer.invoke('proj:list'),
+  projDetail: (p) => ipcRenderer.invoke('proj:detail', p),
+  projFileDiff: (p, f, c) => ipcRenderer.invoke('proj:fileDiff', p, f, c),
+  projCommitDiff: (p, h) => ipcRenderer.invoke('proj:commitDiff', p, h),
+  projAction: (p, a) => ipcRenderer.invoke('proj:action', p, a),
+  projCheckout: (p, b) => ipcRenderer.invoke('proj:checkout', p, b),
+  projOpen: (p, app) => ipcRenderer.send('proj:open', p, app),
 
   pickDirectory: () => ipcRenderer.invoke('sys:pickDirectory'),
   openInFinder: (p) => ipcRenderer.send('sys:openInFinder', p),
