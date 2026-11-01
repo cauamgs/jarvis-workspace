@@ -8,6 +8,15 @@ import '@fontsource/share-tech-mono/400.css'
 import '@xterm/xterm/css/xterm.css'
 import './styles/hud.css'
 
+// Sem animações com a janela fora de foco ou escondida (economiza CPU/GPU).
+const setPaused = (): void => {
+  document.documentElement.classList.toggle('paused', document.hidden || !document.hasFocus())
+}
+window.addEventListener('focus', setPaused)
+window.addEventListener('blur', setPaused)
+document.addEventListener('visibilitychange', setPaused)
+setPaused()
+
 // A mesma página serve a janela principal e a busca rápida (#palette).
 const root = createRoot(document.getElementById('root')!)
 if (location.hash === '#palette') {

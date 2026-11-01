@@ -51,6 +51,16 @@ const api: JarvisApi = {
   onPaletteShown: (cb) => subscribe('palette:shown', cb),
   shortcutLabel: ipcRenderer.sendSync('sys:shortcutLabel'),
 
+  sysSnapshot: () => ipcRenderer.invoke('sys:snapshot'),
+  sysPorts: () => ipcRenderer.invoke('sys:ports'),
+  sysProcesses: () => ipcRenderer.invoke('sys:processes'),
+  sysKill: (pid, force) => ipcRenderer.invoke('sys:kill', pid, force),
+  sysDocker: () => ipcRenderer.invoke('sys:docker'),
+  sysDockerAction: (id, a) => ipcRenderer.invoke('sys:dockerAction', id, a),
+  sysDockerLogs: (id) => ipcRenderer.invoke('sys:dockerLogs', id),
+  sysStartDocker: () => ipcRenderer.invoke('sys:startDocker'),
+  openExternal: (url) => ipcRenderer.send('sys:openExternal', url),
+
   pickDirectory: () => ipcRenderer.invoke('sys:pickDirectory'),
   openInFinder: (p) => ipcRenderer.send('sys:openInFinder', p),
   homeDir: homedir()

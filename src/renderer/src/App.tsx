@@ -10,6 +10,8 @@ import { TerminalView } from './components/TerminalView'
 import { TopBar } from './components/TopBar'
 import { WorkspaceModal } from './components/WorkspaceModal'
 import { chatStore, useActiveChats } from './chatStore'
+import { ModuleRail, type ModuleId } from './components/ModuleRail'
+import { SystemView } from './components/system/SystemView'
 import { inWorkspace, uuid } from './lib'
 
 interface TermSpec {
@@ -33,6 +35,7 @@ export default function App(): React.JSX.Element {
   const [pending, setPending] = useState<Map<string, SessionInfo>>(new Map())
   const [modal, setModal] = useState<{ ws?: Workspace } | null>(null)
   const [liveWarn, setLiveWarn] = useState<string | null>(null)
+  const [module, setModule] = useState<ModuleId>('sessions')
   const activeChats = useActiveChats()
   /** Sessões com algo rodando dentro do Jarvis (terminal ou chat). */
   const inJarvis = useMemo(() => new Set([...terminals.keys(), ...activeChats]), [terminals, activeChats])
@@ -183,14 +186,17 @@ export default function App(): React.JSX.Element {
       case 'show':
         return
       case 'workspace':
+        setModule('sessions')
         setQuery('')
         setView({ kind: 'ws', id: req.id })
         return
       case 'new':
+        setModule('sessions')
         if (req.workspaceId) setView({ kind: 'ws', id: req.workspaceId })
         await newSession({ cwd: req.cwd, workspaceId: req.workspaceId, text: req.text })
         return
       case 'session': {
+        setModule('sessions')
         let s = allRef.current.find((x) => x.id === req.id)
         if (!s) s = (await window.jarvis.listSessions()).find((x) => x.id === req.id)
         if (!s) return
@@ -221,7 +227,10 @@ export default function App(): React.JSX.Element {
       <div className="hud-bg" />
       <div className="app">
         <TopBar total={active.length} live={liveCount} terminals={terminals.size} workspaces={workspaces.length} />
-        <div className="main">
+        <div className="shell">
+          <ModuleRail active={module} onChange={setModule} />
+          {module === 'system' && <SystemView />}
+        <div className="main" style={module === 'sessions' ? undefined : { display: 'none' }}>
           <Sidebar
             view={view}
             onView={setView}
@@ -325,6 +334,7 @@ export default function App(): React.JSX.Element {
               />
             ))}
           </section>
+        </div>
         </div>
         <footer className="statusbar">
           <span className="ok">● SISTEMAS NOMINAIS</span>

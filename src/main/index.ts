@@ -6,6 +6,7 @@ import { DESKTOP_DIR, PROJECTS_DIR, readTranscript, SessionIndexer } from './ind
 import { Palette } from './palette'
 import { PtyManager } from './pty'
 import { WorkspaceStore } from './store'
+import * as system from './system'
 import { JarvisTray } from './tray'
 import type {
   ChatEvent,
@@ -72,7 +73,6 @@ function createWindow(): void {
     backgroundColor: '#02070d',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
-    vibrancy: 'under-window',
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -266,6 +266,18 @@ function registerIpc(): void {
   ipcMain.on('palette:hide', () => palette.hide())
   ipcMain.on('palette:show', () => palette.show())
   ipcMain.on('sys:shortcutLabel', (e) => (e.returnValue = SHORTCUT_LABEL))
+
+  ipcMain.handle('sys:snapshot', () => system.snapshot())
+  ipcMain.handle('sys:ports', () => system.listeningPorts())
+  ipcMain.handle('sys:processes', () => system.processes())
+  ipcMain.handle('sys:kill', (_e, pid: number, force: boolean) => system.killProcess(pid, force))
+  ipcMain.handle('sys:docker', () => system.docker())
+  ipcMain.handle('sys:dockerAction', (_e, id: string, a: 'start' | 'stop' | 'restart') => system.dockerAction(id, a))
+  ipcMain.handle('sys:dockerLogs', (_e, id: string) => system.dockerLogs(id))
+  ipcMain.handle('sys:startDocker', () => system.startDockerEngine())
+  ipcMain.on('sys:openExternal', (_e, url: string) => {
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url)
+  })
 
   ipcMain.handle('sys:pickDirectory', async () => {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] })

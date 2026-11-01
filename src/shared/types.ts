@@ -171,6 +171,57 @@ export interface RewindResult {
   deletions?: number
 }
 
+// ---------- painel do sistema ----------
+
+export interface SystemSnapshot {
+  at: number
+  cpu: { total: number; cores: number[]; load: number[]; model: string }
+  memory: { used: number; total: number; compressed: number; pressure: number }
+  disk: { used: number; total: number }
+  battery: { percent: number; charging: boolean; source: 'ac' | 'battery'; remaining?: string } | null
+  network: { rxPerSec: number; txPerSec: number }
+  uptime: number
+}
+
+export interface ListeningPort {
+  port: number
+  pid: number
+  command: string
+  user: string
+  address: string
+  args?: string
+}
+
+export interface ProcessInfo {
+  pid: number
+  ppid: number
+  cpu: number
+  mem: number
+  rss: number
+  elapsed: string
+  user: string
+  name: string
+  path: string
+}
+
+export interface ContainerInfo {
+  id: string
+  name: string
+  image: string
+  state: string
+  status: string
+  ports: string
+  project?: string
+  cpu?: number
+  mem?: string
+}
+
+export interface DockerState {
+  status: 'running' | 'stopped' | 'missing'
+  containers: ContainerInfo[]
+  error?: string
+}
+
 /** Pedidos de navegação para a janela principal (vindos da busca rápida, barra de menu ou notificações). */
 export type NavRequest =
   | { type: 'show' }
@@ -233,6 +284,16 @@ export interface JarvisApi {
   showPalette(): void
   onPaletteShown(cb: () => void): () => void
   shortcutLabel: string
+
+  sysSnapshot(): Promise<SystemSnapshot>
+  sysPorts(): Promise<ListeningPort[]>
+  sysProcesses(): Promise<ProcessInfo[]>
+  sysKill(pid: number, force: boolean): Promise<{ ok: boolean; error?: string }>
+  sysDocker(): Promise<DockerState>
+  sysDockerAction(id: string, action: 'start' | 'stop' | 'restart'): Promise<{ ok: boolean; error?: string }>
+  sysDockerLogs(id: string): Promise<string>
+  sysStartDocker(): Promise<{ ok: boolean; error?: string }>
+  openExternal(url: string): void
 
   pickDirectory(): Promise<string | null>
   openInFinder(path: string): void
