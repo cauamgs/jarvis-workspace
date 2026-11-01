@@ -36,7 +36,9 @@ export class Palette {
       }
     })
     win.setAlwaysOnTop(true, 'pop-up-menu')
-    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+    // skipTransformProcessType: sem isso o Electron transforma o app inteiro em "UIElement"
+    // (sem ícone no Dock, sem menu, fora do ⌘Tab) para a janela aparecer sobre apps em tela cheia.
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
     win.on('blur', () => this.hide())
     win.on('closed', () => (this.win = null))
 

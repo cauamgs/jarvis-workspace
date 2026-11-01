@@ -284,6 +284,9 @@ app.whenReady().then(async () => {
   registerIpc()
   createWindow()
   palette.create()
+  // Garante o modo normal de app: ícone no Dock, menu e ⌘Tab.
+  app.setActivationPolicy('regular')
+  void app.dock?.show()
   tray.create()
   shortcutOk = globalShortcut.register(SHORTCUT, () => palette.toggle())
   if (!shortcutOk) console.warn(`Atalho ${SHORTCUT} indisponível (em uso por outro app).`)
