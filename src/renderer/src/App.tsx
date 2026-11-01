@@ -255,6 +255,14 @@ export default function App(): React.JSX.Element {
                   onOpenTerminal={() => openTerminal(selected)}
                   onCloseTerminal={() => closeTerminal(selected.id)}
                   onCloseChat={() => void window.jarvis.chatClose(selected.id)}
+                  onRename={(title) => void window.jarvis.renameSession(selected.id, title).then(reload)}
+                  onFork={async () => {
+                    const r = await window.jarvis.forkSession(selected.id)
+                    if (r.ok && r.sessionId) {
+                      await reload()
+                      select(r.sessionId)
+                    }
+                  }}
                   onToggleWorkspace={(wsId, on) => void assign(wsId, selected.id, on)}
                 />
                 {liveWarn === selected.id && (
@@ -289,7 +297,11 @@ export default function App(): React.JSX.Element {
                   (terminals.has(selected.id) ? (
                     <div className="empty">Sessão aberta no terminal do Jarvis — encerre o terminal para usar o chat</div>
                   ) : (
-                    <ChatView session={selected} version={version} />
+                    <ChatView
+                      session={selected}
+                      version={version}
+                      onOpenSession={(id) => void reload().then(() => select(id))}
+                    />
                   ))}
               </>
             ) : (

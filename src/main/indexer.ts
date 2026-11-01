@@ -282,13 +282,44 @@ export function toMessage(d: any): TranscriptMessage | null {
     for (const c of content) {
       if (c.type === 'text' && c.text) blocks.push({ kind: 'text', text: c.text })
       else if (c.type === 'thinking' && c.thinking) blocks.push({ kind: 'thinking', text: c.thinking })
-      else if (c.type === 'tool_use') blocks.push({ kind: 'tool_use', name: c.name, input: summarizeInput(c.input) })
+      else if (c.type === 'tool_use')
+        blocks.push({
+          kind: 'tool_use',
+          id: c.id,
+          name: c.name,
+          input: summarizeInput(c.input),
+          raw: clampDeep(c.input) as Record<string, unknown>
+        })
       else if (c.type === 'tool_result')
-        blocks.push({ kind: 'tool_result', text: truncate(extractUserText(c.content), 1200) ?? '', isError: c.is_error })
+        blocks.push({
+          kind: 'tool_result',
+          toolUseId: c.tool_use_id,
+          text: truncate(extractUserText(c.content), MAX_RESULT) ?? '',
+          isError: c.is_error
+        })
+      else if (c.type === 'image' && c.source?.type === 'base64')
+        blocks.push({
+          kind: 'image',
+          mediaType: c.source.media_type,
+          // Imagens grandes do histórico ficam só como marcador, para não pesar a interface.
+          data: c.source.data?.length < MAX_IMAGE_B64 ? c.source.data : undefined
+        })
     }
   }
   if (!blocks.length) return null
   return { uuid: d.uuid, role: d.type, timestamp: d.timestamp, blocks }
+}
+
+const MAX_RESULT = 12000
+const MAX_STRING = 20000
+const MAX_IMAGE_B64 = 1_500_000
+
+/** Copia a entrada de uma ferramenta limitando strings longas (ex.: conteúdo de um Write). */
+function clampDeep(v: unknown, depth = 0): unknown {
+  if (typeof v === 'string') return v.length > MAX_STRING ? v.slice(0, MAX_STRING) + '\n… (truncado)' : v
+  if (depth > 6 || v === null || typeof v !== 'object') return v
+  if (Array.isArray(v)) return v.slice(0, 200).map((x) => clampDeep(x, depth + 1))
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, clampDeep(x, depth + 1)]))
 }
 
 export function summarizeInput(input: any): string {

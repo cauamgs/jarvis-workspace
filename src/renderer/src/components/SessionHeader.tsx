@@ -10,11 +10,15 @@ interface Props {
   onOpenTerminal: () => void
   onCloseTerminal: () => void
   onCloseChat: () => void
+  onRename: (title: string) => void
+  onFork: () => void
   onToggleWorkspace: (wsId: string, assigned: boolean) => void
 }
 
 export function SessionHeader({ session: s, workspaces, ...p }: Props): React.JSX.Element {
   const [menu, setMenu] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(s.title)
   const ref = useRef<HTMLDivElement>(null)
   const home = window.jarvis.homeDir
 
@@ -29,7 +33,31 @@ export function SessionHeader({ session: s, workspaces, ...p }: Props): React.JS
 
   return (
     <div className="detail-head">
-      <h1>{s.title}</h1>
+      {editing ? (
+        <input
+          className="input title-edit"
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => setEditing(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (draft.trim() && draft.trim() !== s.title) p.onRename(draft.trim())
+              setEditing(false)
+            } else if (e.key === 'Escape') setEditing(false)
+          }}
+        />
+      ) : (
+        <h1
+          title="Clique para renomear"
+          onClick={() => {
+            setDraft(s.title)
+            setEditing(true)
+          }}
+        >
+          {s.title} <span className="rename-hint">✎</span>
+        </h1>
+      )}
       <div className="kv">
         <span className="path" onClick={() => window.jarvis.openInFinder(s.projectPath)} title="Abrir no Finder">
           <b>PROJETO</b>{shortPath(s.projectPath, home)}
@@ -75,6 +103,11 @@ export function SessionHeader({ session: s, workspaces, ...p }: Props): React.JS
             </div>
           )}
         </div>
+        {s.filePath && (
+          <button className="btn ghost" onClick={p.onFork} title="Nova sessão com uma cópia de toda a conversa">
+            ⑂ Ramificar
+          </button>
+        )}
         <button className="btn ghost" onClick={() => navigator.clipboard.writeText(`claude --resume ${s.id}`)} title="Copiar comando">
           ⧉ Copiar ID
         </button>

@@ -31,6 +31,11 @@ Gera o `.app` (Apple Silicon), assina ad-hoc e instala em `/Applications/Jarvis 
 - **Chat** (`src/main/chat.ts`) usa o Claude Agent SDK apontando para o `claude` instalado do usuário
   (mesmo login, settings, CLAUDE.md e MCPs). Retoma sessões existentes (`resume`) ou cria novas com ID
   reservado (`sessionId`); pedidos de permissão viram cartões na interface. O processo fecha após 20 min ocioso.
+  Na conversa: cartões por ferramenta (diff de Edit, comando/saída de Bash, subagentes ao vivo),
+  painel de plano (TaskCreate/TaskUpdate/TodoWrite), tarefas em segundo plano, formulário do
+  AskUserQuestion, aprovação de plano (ExitPlanMode), imagens (colar/arrastar/anexar), comandos `/`
+  com autocompletar, sugestão do próximo pedido, esforço, medidor de contexto, painel MCP, limites de
+  uso, ramificar (`forkSession`), restaurar arquivos (`rewindFiles`, só ou com a conversa) e renomear.
 - **Terminal** (`src/main/pty.ts`) roda `claude --resume <id>` (ou `--session-id` para sessões novas) num PTY.
 
 - **Busca rápida** (`src/main/palette.ts`, `src/renderer/src/Palette.tsx`): atalho global **⇧⌘J**

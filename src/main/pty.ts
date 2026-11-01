@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs'
-import { homedir } from 'node:os'
 import * as pty from 'node-pty'
 import { cleanEnv } from './shellEnv'
 
@@ -27,6 +26,7 @@ export class PtyManager {
     const existing = this.terms.get(key)
     if (existing) return { replay: existing.buffer }
 
+    if (!existsSync(cwd)) throw new Error(`A pasta desta sessão não existe mais: ${cwd}`)
     const shell = process.env.SHELL || '/bin/zsh'
     const args = resumeId ? `--resume ${resumeId}` : newSessionId ? `--session-id ${newSessionId}` : ''
     // Shell de login interativo: o app aberto pelo Finder não herda o PATH do usuário.
@@ -34,7 +34,7 @@ export class PtyManager {
       name: 'xterm-256color',
       cols: 120,
       rows: 32,
-      cwd: existsSync(cwd) ? cwd : homedir(),
+      cwd,
       env: { ...cleanEnv(), TERM: 'xterm-256color', COLORTERM: 'truecolor' }
     })
     const term: Term = { proc, buffer: '' }

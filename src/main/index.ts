@@ -1,13 +1,23 @@
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Notification, shell } from 'electron'
-import { mkdirSync, watch, type FSWatcher } from 'node:fs'
+import { mkdirSync, promises as fsp, watch, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
-import { ChatManager } from './chat'
+import { ChatManager, forkSession, renameSession } from './chat'
 import { DESKTOP_DIR, PROJECTS_DIR, readTranscript, SessionIndexer } from './indexer'
 import { Palette } from './palette'
 import { PtyManager } from './pty'
 import { WorkspaceStore } from './store'
 import { JarvisTray } from './tray'
-import type { ChatEvent, ChatSendOptions, NavRequest, PermissionMode, SessionInfo, Workspace } from '@shared/types'
+import type {
+  ChatEvent,
+  ChatImage,
+  ChatSendOptions,
+  EffortLevel,
+  NavRequest,
+  PermissionMode,
+  PermissionResponse,
+  SessionInfo,
+  Workspace
+} from '@shared/types'
 
 let win: BrowserWindow | null = null
 let quitting = false
@@ -48,7 +58,8 @@ let sessions: SessionInfo[] = []
 const pending = new Map<string, Set<string>>()
 
 async function refreshSessions(): Promise<SessionInfo[]> {
-  sessions = await indexer.listSessions()
+  const titles = store.titles()
+  sessions = (await indexer.listSessions()).map((s) => (titles[s.id] ? { ...s, title: titles[s.id] } : s))
   return sessions
 }
 
@@ -206,9 +217,47 @@ function registerIpc(): void {
   ipcMain.handle('chat:setModel', (_e, key: string, model: string) => chats.setModel(key, model))
   ipcMain.handle('chat:active', () => chats.active())
   ipcMain.handle('chat:info', (_e, key: string) => chats.info(key))
-  ipcMain.on('chat:permission', (_e, key: string, id: string, decision: 'allow' | 'always' | 'deny') =>
-    chats.respondPermission(key, id, decision)
+  ipcMain.on('chat:permission', (_e, key: string, id: string, r: PermissionResponse) =>
+    chats.respondPermission(key, id, r)
   )
+  ipcMain.handle('chat:setEffort', (_e, key: string, effort: EffortLevel) => chats.setEffort(key, effort))
+  ipcMain.handle('chat:rewind', (_e, key: string, msgId: string, dryRun: boolean) => chats.rewind(key, msgId, dryRun))
+  ipcMain.handle('chat:mcpStatus', (_e, key: string) => chats.mcpStatus(key))
+  ipcMain.handle('chat:mcpToggle', (_e, key: string, name: string, on: boolean) => chats.mcpToggle(key, name, on))
+  ipcMain.handle('chat:mcpReconnect', (_e, key: string, name: string) => chats.mcpReconnect(key, name))
+
+  ipcMain.handle('session:fork', async (_e, id: string, upTo?: string) => {
+    const r = await forkSession(id, upTo)
+    if (r.ok && r.sessionId) {
+      const base = sessions.find((s) => s.id === id)
+      // A cópia herda os workspaces da original.
+      for (const ws of store.list()) if (ws.sessionIds.includes(id)) await store.assign(ws.id, r.sessionId, true)
+      if (base) await store.setTitle(r.sessionId, `${base.title} (ramificação)`)
+    }
+    return r
+  })
+  ipcMain.handle('session:rename', async (_e, id: string, title: string) => {
+    await store.setTitle(id, title)
+    // Sessões do terminal também recebem o título no transcript (visível no `claude --resume`).
+    if (sessions.find((s) => s.id === id)?.source === 'cli') await renameSession(id, title).catch(() => undefined)
+    await refreshSessions()
+    win?.webContents.send('sessions:changed')
+  })
+
+  ipcMain.handle('sys:pickImages', async (): Promise<ChatImage[]> => {
+    const r = await dialog.showOpenDialog(win!, {
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: 'Imagens', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }]
+    })
+    if (r.canceled) return []
+    return Promise.all(
+      r.filePaths.map(async (f) => {
+        const ext = f.split('.').pop()!.toLowerCase()
+        const mediaType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`
+        return { mediaType, data: (await fsp.readFile(f)).toString('base64'), name: f.split('/').pop() }
+      })
+    )
+  })
 
   ipcMain.on('nav:request', (_e, req: NavRequest) => {
     nav(req)

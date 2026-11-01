@@ -1,5 +1,16 @@
 import { useSyncExternalStore } from 'react'
-import type { ChatEvent, ChatPermissionRequest, ChatState, PermissionMode, TranscriptMessage } from '@shared/types'
+import type {
+  BackgroundTask,
+  ChatEvent,
+  ChatPermissionRequest,
+  ChatState,
+  ContextUsage,
+  EffortLevel,
+  PermissionMode,
+  RateLimitInfo,
+  SlashCommandInfo,
+  TranscriptMessage
+} from '@shared/types'
 
 export interface ChatSlot {
   state: ChatState
@@ -10,17 +21,47 @@ export interface ChatSlot {
   model?: string
   models: { value: string; label: string }[]
   permissionMode: PermissionMode
+  effort: EffortLevel | ''
   lastResult?: { costUsd?: number; durationMs: number; isError: boolean; error?: string }
+  /** Atividade dos subagentes, por id da ferramenta Agent que os criou. */
+  subagents: Record<string, TranscriptMessage[]>
+  tasks: BackgroundTask[]
+  suggestion?: string
+  context?: ContextUsage
+}
+
+/** Estado que não pertence a uma sessão: conta, limites de uso e comandos disponíveis. */
+export interface ChatGlobal {
+  rateLimit?: RateLimitInfo
+  account?: { email?: string; subscriptionType?: string }
+  commands: SlashCommandInfo[]
 }
 
 const MODE_KEY = 'jarvis.permissionMode'
+const EFFORT_KEY = 'jarvis.effort'
+const COMMANDS_KEY = 'jarvis.commands'
+const MAX_SUBAGENT_MESSAGES = 60
 
-function defaultMode(): PermissionMode {
+function read<T>(key: string, fallback: T): T {
   try {
-    return (localStorage.getItem(MODE_KEY) as PermissionMode) || 'default'
+    const v = localStorage.getItem(key)
+    return v === null ? fallback : (JSON.parse(v) as T)
   } catch {
-    return 'default'
+    return fallback
   }
+}
+
+function write(key: string, value: unknown): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* armazenamento indisponível */
+  }
+}
+
+function safeDefaultMode(): PermissionMode {
+  const m = read<PermissionMode>(MODE_KEY, 'default')
+  return m === 'plan' || m === 'bypassPermissions' ? 'default' : m
 }
 
 /** Estado dos chats por sessão — vive fora dos componentes para sobreviver à troca de sessão. */
@@ -30,17 +71,24 @@ class ChatStore {
   private version = 0
   /** Substituído (nunca mutado) a cada mudança, para o React perceber. */
   private activeKeys = new Set<string>()
+  global: ChatGlobal = { commands: read<SlashCommandInfo[]>(COMMANDS_KEY, []) }
 
   constructor() {
     window.jarvis.onChatEvent((key, ev) => this.apply(key, ev))
     window.jarvis.chatActive().then((keys) => {
       this.activeKeys = new Set(keys)
       this.changed()
-      // Após um reload da janela, recupera modelo/modo e se há um turno em andamento.
+      // Após um reload da janela, recupera o estado das sessões que continuam vivas.
       for (const k of keys)
         window.jarvis.chatInfo(k).then((info) => {
-          if (info?.init) this.apply(k, info.init)
-          if (info?.running) this.update(k, { state: 'running' })
+          if (!info) return
+          if (info.init) this.apply(k, info.init)
+          this.update(k, {
+            state: info.running ? 'running' : 'idle',
+            permissions: info.permissions,
+            tasks: info.tasks,
+            context: info.context
+          })
         })
     })
   }
@@ -48,7 +96,17 @@ class ChatStore {
   get(key: string): ChatSlot {
     let s = this.slots.get(key)
     if (!s) {
-      s = { state: 'idle', live: [], draft: null, permissions: [], models: [], permissionMode: defaultMode() }
+      s = {
+        state: 'idle',
+        live: [],
+        draft: null,
+        permissions: [],
+        models: [],
+        permissionMode: safeDefaultMode(),
+        effort: read<EffortLevel | ''>(EFFORT_KEY, ''),
+        subagents: {},
+        tasks: []
+      }
       this.slots.set(key, s)
     }
     return s
@@ -61,11 +119,8 @@ class ChatStore {
 
   setMode(key: string, mode: PermissionMode): void {
     this.update(key, { permissionMode: mode })
-    try {
-      localStorage.setItem(MODE_KEY, mode)
-    } catch {
-      /* armazenamento indisponível */
-    }
+    // Plano e "sem permissões" valem só para esta sessão — nunca viram o padrão das próximas.
+    if (mode !== 'plan' && mode !== 'bypassPermissions') write(MODE_KEY, mode)
     void window.jarvis.chatSetPermissionMode(key, mode)
   }
 
@@ -74,13 +129,27 @@ class ChatStore {
     void window.jarvis.chatSetModel(key, model)
   }
 
+  setEffort(key: string, effort: EffortLevel | ''): void {
+    this.update(key, { effort })
+    write(EFFORT_KEY, effort)
+    if (effort) void window.jarvis.chatSetEffort(key, effort)
+  }
+
+  clearSuggestion(key: string): void {
+    this.update(key, { suggestion: undefined })
+  }
+
   private apply(key: string, ev: ChatEvent): void {
     const s = this.get(key)
     switch (ev.type) {
       case 'state':
         if ((ev.state === 'starting' || ev.state === 'running') && !this.activeKeys.has(key))
           this.activeKeys = new Set([...this.activeKeys, key])
-        this.update(key, { state: ev.state, error: ev.error ?? (ev.state === 'error' ? s.error : undefined) })
+        this.update(key, {
+          state: ev.state,
+          error: ev.error ?? (ev.state === 'error' ? s.error : undefined),
+          suggestion: ev.state === 'running' ? undefined : s.suggestion
+        })
         if (ev.state === 'idle' || ev.state === 'error') {
           // "idle" chega tanto ao fim de um turno quanto ao fechar o processo; só o segundo remove das ativas.
           window.jarvis.chatActive().then((keys) => {
@@ -92,6 +161,11 @@ class ChatStore {
         break
       case 'init':
         this.update(key, { model: ev.model, models: ev.models, permissionMode: ev.permissionMode })
+        if (ev.commands.length) {
+          write(COMMANDS_KEY, ev.commands)
+          this.global = { ...this.global, commands: ev.commands }
+        }
+        if (ev.account) this.global = { ...this.global, account: ev.account }
         break
       case 'message':
         if (!s.live.some((m) => m.uuid === ev.message.uuid)) this.update(key, { live: [...s.live, ev.message] })
@@ -103,13 +177,37 @@ class ChatStore {
         this.update(key, { draft: null })
         break
       case 'permission':
-        this.update(key, { permissions: [...s.permissions, ev.request] })
+        if (!s.permissions.some((p) => p.id === ev.request.id))
+          this.update(key, { permissions: [...s.permissions, ev.request] })
         break
       case 'permission-done':
         this.update(key, { permissions: s.permissions.filter((p) => p.id !== ev.id) })
         break
       case 'result':
         this.update(key, { lastResult: ev, draft: null })
+        break
+      case 'subagent': {
+        const prev = s.subagents[ev.parentId] ?? []
+        if (prev.some((m) => m.uuid === ev.message.uuid)) break
+        this.update(key, {
+          subagents: { ...s.subagents, [ev.parentId]: [...prev, ev.message].slice(-MAX_SUBAGENT_MESSAGES) }
+        })
+        break
+      }
+      case 'task': {
+        const others = s.tasks.filter((t) => t.id !== ev.task.id)
+        this.update(key, { tasks: [...others, ev.task] })
+        break
+      }
+      case 'suggestion':
+        this.update(key, { suggestion: ev.text })
+        break
+      case 'context':
+        this.update(key, { context: ev.usage })
+        break
+      case 'rate-limit':
+        this.global = { ...this.global, rateLimit: ev.info }
+        this.changed()
         break
     }
   }
@@ -137,6 +235,11 @@ export const chatStore = new ChatStore()
 export function useChat(key: string): ChatSlot {
   useSyncExternalStore(chatStore.subscribe, chatStore.snapshot)
   return chatStore.get(key)
+}
+
+export function useChatGlobal(): ChatGlobal {
+  useSyncExternalStore(chatStore.subscribe, chatStore.snapshot)
+  return chatStore.global
 }
 
 export function useActiveChats(): Set<string> {
