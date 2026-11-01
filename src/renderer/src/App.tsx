@@ -13,6 +13,7 @@ import { chatStore, useActiveChats } from './chatStore'
 import { ModuleRail, type ModuleId } from './components/ModuleRail'
 import { SystemView } from './components/system/SystemView'
 import { ProjectsView } from './components/projects/ProjectsView'
+import { AutomationView } from './components/automation/AutomationView'
 import { inWorkspace, uuid } from './lib'
 
 interface TermSpec {
@@ -240,6 +241,7 @@ export default function App(): React.JSX.Element {
         <div className="shell">
           <ModuleRail active={module} onChange={setModule} />
           {module === 'system' && <SystemView />}
+          {module === 'automation' && <AutomationView />}
           {module === 'projects' && <ProjectsView focusPath={projectFocus} onNavigate={(req) => void navRef.current(req)} />}
         <div className="main" style={module === 'sessions' ? undefined : { display: 'none' }}>
           <Sidebar

@@ -9,6 +9,7 @@ import { WorkspaceStore } from './store'
 import * as system from './system'
 import * as projects from './projects'
 import { Voice } from './voice'
+import * as automation from './automation'
 import { JarvisTray } from './tray'
 import type {
   ChatEvent,
@@ -18,6 +19,8 @@ import type {
   NavRequest,
   PermissionMode,
   PermissionResponse,
+  AutoAction,
+  Routine,
   SessionInfo,
   Workspace
 } from '@shared/types'
@@ -56,6 +59,7 @@ const tray = new JarvisTray({
   nav
 })
 const watchers: FSWatcher[] = []
+const routines = new automation.RoutineStore(join(userData, 'routines.json'))
 // Eventos de voz vão para as duas janelas: a busca rápida e o chat (ditado) usam a mesma escuta.
 const voice = new Voice((ev) => {
   win?.webContents.send('voice:event', ev)
@@ -304,6 +308,20 @@ function registerIpc(): void {
   ipcMain.handle('proj:checkout', (_e, p: string, b: string) => projects.checkout(p, b))
   ipcMain.on('proj:open', (_e, p: string, app: 'finder' | 'terminal' | 'vscode') => projects.openWith(p, app))
 
+  ipcMain.handle('auto:apps', () => automation.listApps())
+  ipcMain.handle('auto:shortcuts', () => automation.listShortcuts())
+  // Passos de shell só rodam dentro de rotinas salvas pelo usuário — nunca como ação avulsa vinda da interface.
+  ipcMain.handle('auto:run', (_e, a: AutoAction) =>
+    a.type === 'shell' ? { ok: false, output: 'Comandos de shell só rodam dentro de rotinas.' } : automation.runAction(a)
+  )
+  ipcMain.handle('auto:routines', () => routines.list())
+  ipcMain.handle('auto:saveRoutine', (_e, r: Routine) => routines.save(r))
+  ipcMain.handle('auto:deleteRoutine', (_e, id: string) => routines.remove(id))
+  ipcMain.handle('auto:runRoutine', async (_e, id: string) => {
+    const r = routines.list().find((x) => x.id === id)
+    return r ? automation.runRoutine(r) : [{ ok: false, output: 'Rotina não encontrada.' }]
+  })
+
   ipcMain.handle('sys:pickDirectory', async () => {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : r.filePaths[0]
@@ -317,7 +335,7 @@ app.on('second-instance', () => showMain())
 
 app.whenReady().then(async () => {
   app.setName('Jarvis WorkSpace')
-  await Promise.all([indexer.load(), store.load()])
+  await Promise.all([indexer.load(), store.load(), routines.load()])
   registerIpc()
   createWindow()
   palette.create()

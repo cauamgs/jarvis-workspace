@@ -46,4 +46,14 @@ Gera o `.app` (Apple Silicon), assina ad-hoc e instala em `/Applications/Jarvis 
 - **Notificações**: pedido de permissão ou turno concluído com o Jarvis fora de foco geram notificação;
   permissões pendentes aparecem como contador na barra de menu e no Dock.
 
+- **Painel do sistema** (`src/main/system.ts`): CPU, memória, disco, bateria, rede, portas (lsof),
+  processos e containers Docker/OrbStack, com ações de encerrar/iniciar/parar/logs.
+- **Central de projetos** (`src/main/projects.ts`): repositórios Git descobertos automaticamente, status,
+  diffs, commits, branches, fetch/pull e atalhos para GitHub/GitLab, VS Code e sessões do Claude.
+- **Comando por voz** (`native/speech.swift`, `src/main/voice.ts`): reconhecimento nativo do macOS em pt-BR.
+  ⌥⌘J abre a busca ouvindo; comandos locais executam direto; respostas a pedidos por voz são faladas.
+  Só funciona no app instalado (o macOS exige as permissões declaradas no Info.plist do app).
+- **Automação do Mac** (`src/main/automation.ts`): abrir apps, Atalhos do macOS, volume, aparência, dormir a
+  tela e rotinas com vários passos, disparadas pela busca, por voz ou pelo módulo Automação.
+
 Os formatos do Claude são internos e podem mudar — o Jarvis nunca escreve neles.

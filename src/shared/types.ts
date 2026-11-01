@@ -268,13 +268,42 @@ export type VoiceEvent =
   | { type: 'final'; text: string }
   | { type: 'error'; message: string }
 
+// ---------- automação do Mac ----------
+
+export interface AppEntry {
+  name: string
+  path: string
+}
+
+export type AutoActionType = 'app' | 'quit' | 'url' | 'folder' | 'shortcut' | 'volume' | 'darkmode' | 'sleep-display' | 'shell' | 'wait'
+
+export interface AutoAction {
+  type: AutoActionType
+  /** Nome do app, URL, pasta, nome do atalho, volume (0–100), on/off/toggle, comando ou segundos. */
+  target: string
+}
+
+export interface AutoResult {
+  ok: boolean
+  output: string
+}
+
+export interface Routine {
+  id: string
+  name: string
+  icon: string
+  /** Frases que disparam a rotina por voz/busca, além do nome (ex.: "foco", "hora de trabalhar"). */
+  triggers: string[]
+  steps: AutoAction[]
+}
+
 /** Pedidos de navegação para a janela principal (vindos da busca rápida, barra de menu ou notificações). */
 export type NavRequest =
   | { type: 'show' }
   | { type: 'session'; id: string; send?: string; voice?: boolean }
   | { type: 'workspace'; id: string }
   | { type: 'new'; cwd: string; workspaceId?: string; text?: string; voice?: boolean }
-  | { type: 'module'; id: 'sessions' | 'system' | 'projects' }
+  | { type: 'module'; id: 'sessions' | 'system' | 'projects' | 'automation' }
   | { type: 'project'; path: string }
 
 export interface JarvisApi {
@@ -357,6 +386,14 @@ export interface JarvisApi {
   projAction(path: string, action: 'fetch' | 'pull'): Promise<{ ok: boolean; out: string }>
   projCheckout(path: string, branch: string): Promise<{ ok: boolean; out: string }>
   projOpen(path: string, app: 'finder' | 'terminal' | 'vscode'): void
+
+  autoApps(): Promise<AppEntry[]>
+  autoShortcuts(): Promise<string[]>
+  autoRun(action: AutoAction): Promise<AutoResult>
+  autoRoutines(): Promise<Routine[]>
+  autoSaveRoutine(r: Routine): Promise<Routine[]>
+  autoDeleteRoutine(id: string): Promise<Routine[]>
+  autoRunRoutine(id: string): Promise<AutoResult[]>
 
   pickDirectory(): Promise<string | null>
   openInFinder(path: string): void

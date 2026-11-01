@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { NavRequest, SessionInfo, Workspace } from '@shared/types'
+import type { AppEntry, AutoAction, NavRequest, Routine, SessionInfo, Workspace } from '@shared/types'
 import { ArcReactor } from './components/ArcReactor'
 import { inWorkspace, timeAgo } from './lib'
-import { cleanUtterance, parseCommand, speak } from './voice'
+import { cleanUtterance, parseCommand, speak, type Command } from './voice'
 
 type Item =
   | { kind: 'open' }
-  | { kind: 'cmd'; req: NavRequest; say: string }
+  | { kind: 'cmd'; cmd: Command }
+  | { kind: 'app'; app: AppEntry }
+  | { kind: 'shortcut'; name: string }
+  | { kind: 'routine'; routine: Routine }
   | { kind: 'session'; s: SessionInfo; running: boolean }
   | { kind: 'ws'; ws: Workspace }
   | { kind: 'new'; label: string; cwd: string; workspaceId?: string; color?: string }
@@ -21,6 +24,9 @@ export function Palette(): React.JSX.Element {
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [active, setActive] = useState<Set<string>>(new Set())
+  const [apps, setApps] = useState<AppEntry[]>([])
+  const [shortcuts, setShortcuts] = useState<string[]>([])
+  const [routines, setRoutines] = useState<Routine[]>([])
   const [query, setQuery] = useState('')
   const [index, setIndex] = useState(0)
   const input = useRef<HTMLInputElement>(null)
@@ -32,18 +38,24 @@ export function Palette(): React.JSX.Element {
   const [fromVoice, setFromVoice] = useState(false)
   /** Só processa a escuta que a própria busca iniciou (o ditado do chat usa o mesmo microfone). */
   const ownsVoice = useRef(false)
-  const dataRef = useRef({ sessions, workspaces })
-  dataRef.current = { sessions, workspaces }
+  const dataRef = useRef({ sessions, workspaces, apps, shortcuts, routines })
+  dataRef.current = { sessions, workspaces, apps, shortcuts, routines }
 
   async function refresh(): Promise<void> {
-    const [s, w, a] = await Promise.all([
+    const [s, w, a, ap, sc, r] = await Promise.all([
       window.jarvis.listSessions(),
       window.jarvis.listWorkspaces(),
-      window.jarvis.chatActive()
+      window.jarvis.chatActive(),
+      window.jarvis.autoApps(),
+      window.jarvis.autoShortcuts(),
+      window.jarvis.autoRoutines()
     ])
     setSessions(s)
     setWorkspaces(w)
     setActive(new Set(a))
+    setApps(ap)
+    setShortcuts(sc)
+    setRoutines(r)
   }
 
   async function startVoice(): Promise<void> {
@@ -85,11 +97,8 @@ export function Palette(): React.JSX.Element {
         setQuery(text)
         setFromVoice(true)
         // Comandos locais executam na hora; pedidos para o Claude esperam confirmação (Enter).
-        const cmd = text && parseCommand(text, dataRef.current.sessions, dataRef.current.workspaces)
-        if (cmd) {
-          speak(cmd.say)
-          window.jarvis.navigate(cmd.req)
-        }
+        const cmd = text && parseCommand(text, dataRef.current)
+        if (cmd) void execute(cmd, true)
         requestAnimationFrame(() => input.current?.focus())
       } else if (ev.type === 'error') setVoiceError(ev.message)
     })
@@ -111,6 +120,7 @@ export function Palette(): React.JSX.Element {
       const recent = visible.filter((s) => !isRunning(s)).slice(0, 6)
       const groups: Group[] = [
         { title: 'AÇÕES', items: [{ kind: 'open' }] },
+        { title: 'ROTINAS', items: routines.map((routine) => ({ kind: 'routine', routine }) as Item) },
         { title: 'EM EXECUÇÃO', items: running.slice(0, 6).map(toItem) },
         { title: 'RECENTES', items: recent.map(toItem) },
         { title: 'WORKSPACES', items: workspaces.map((ws) => ({ kind: 'ws', ws }) as Item) }
@@ -143,14 +153,22 @@ export function Palette(): React.JSX.Element {
       targets.push({ kind: 'new', label: s.projectName, cwd: s.projectPath })
     }
 
-    const cmd = parseCommand(query, sessions, workspaces)
+    const cmd = parseCommand(query, { sessions, workspaces, apps, shortcuts, routines })
+    const nq = q.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const plain = (x: string): string => x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const appHits = apps.filter((a) => plain(a.name).includes(nq)).sort((a, b) => Number(!plain(a.name).startsWith(nq)) - Number(!plain(b.name).startsWith(nq))).slice(0, 5)
+    const routineHits = routines.filter((r) => [r.name, ...r.triggers].some((g) => plain(g).includes(nq)))
+    const shortcutHits = shortcuts.filter((x) => plain(x).includes(nq)).slice(0, 4)
     return [
-      ...(cmd ? [{ title: 'COMANDO', items: [{ kind: 'cmd', req: cmd.req, say: cmd.say } as Item] }] : []),
+      ...(cmd ? [{ title: 'COMANDO', items: [{ kind: 'cmd', cmd } as Item] }] : []),
+      { title: 'ROTINAS', items: routineHits.map((routine) => ({ kind: 'routine', routine }) as Item) },
+      { title: 'APPS', items: appHits.map((app) => ({ kind: 'app', app }) as Item) },
+      { title: 'ATALHOS DO MACOS', items: shortcutHits.map((name) => ({ kind: 'shortcut', name }) as Item) },
       { title: 'SESSÕES', items: found.map(toItem) },
       { title: 'WORKSPACES', items: workspaces.filter((w) => matches(w.name.toLowerCase())).map((ws) => ({ kind: 'ws', ws }) as Item) },
       { title: 'NOVA SESSÃO COM ESTE PEDIDO', items: targets }
     ].filter((g) => g.items.length)
-  }, [query, sessions, workspaces, active])
+  }, [query, sessions, workspaces, active, apps, shortcuts, routines])
 
   const flat = useMemo(() => groups.flatMap((g) => g.items), [groups])
   const current = flat[Math.min(index, flat.length - 1)]
@@ -169,8 +187,13 @@ export function Palette(): React.JSX.Element {
         req = { type: 'show' }
         break
       case 'cmd':
-        req = item.req
-        break
+        return void execute(item.cmd, fromVoice)
+      case 'app':
+        return void execute({ auto: { type: 'app', target: item.app.path }, say: `Abrindo ${item.app.name}.` }, fromVoice)
+      case 'shortcut':
+        return void execute({ auto: { type: 'shortcut', target: item.name }, say: `Rodando ${item.name}.` }, fromVoice)
+      case 'routine':
+        return void execute({ routine: item.routine, say: `Executando ${item.routine.name}.` }, fromVoice)
       case 'session':
         req = { type: 'session', id: item.s.id, send: sendText && text ? text : undefined, voice: fromVoice }
         break
@@ -182,6 +205,16 @@ export function Palette(): React.JSX.Element {
         break
     }
     window.jarvis.navigate(req)
+  }
+
+  /** Executa um comando local: navegação, ação do Mac ou rotina. */
+  async function execute(cmd: Command, spoken: boolean): Promise<void> {
+    if (spoken) speak(cmd.say)
+    if ('req' in cmd) return window.jarvis.navigate(cmd.req)
+    window.jarvis.hidePalette()
+    const results = 'routine' in cmd ? await window.jarvis.autoRunRoutine(cmd.routine.id) : [await window.jarvis.autoRun(cmd.auto as AutoAction)]
+    const failed = results.find((r) => !r.ok)
+    if (failed && spoken) speak('Não consegui concluir: ' + failed.output.slice(0, 120))
   }
 
   function onKey(e: React.KeyboardEvent): void {
@@ -279,14 +312,51 @@ export function Palette(): React.JSX.Element {
   )
 }
 
+/** A frase falada ("Abrindo X.") vira o rótulo da ação na lista ("Abrir X"). */
+function actionLabel(say: string): string {
+  return say
+    .replace(/\.$/, '')
+    .replace(/^Abrindo /, 'Abrir ')
+    .replace(/^Executando /, 'Executar ')
+    .replace(/^Rodando /, 'Rodar ')
+    .replace(/^Apagando /, 'Apagar ')
+    .replace(/^Volume em (\d+) por cento$/, 'Volume em $1%')
+    .replace(/^Modo (escuro|claro) ativado$/, 'Ativar modo $1')
+    .replace(/^Som desligado$/, 'Silenciar')
+}
+
 function ItemView({ item, hasText }: { item: Item; hasText: boolean }): React.JSX.Element {
   switch (item.kind) {
     case 'cmd':
       return (
         <>
           <span className="p-glyph">⚡</span>
-          <span className="p-title">{item.say.replace(/\.$/, '')}</span>
+          <span className="p-title">{actionLabel(item.cmd.say)}</span>
           <span className="p-meta">comando</span>
+        </>
+      )
+    case 'app':
+      return (
+        <>
+          <span className="p-glyph">▣</span>
+          <span className="p-title">Abrir <b>{item.app.name}</b></span>
+          <span className="p-meta">app</span>
+        </>
+      )
+    case 'shortcut':
+      return (
+        <>
+          <span className="p-glyph">⌘</span>
+          <span className="p-title">Rodar atalho <b>{item.name}</b></span>
+          <span className="p-meta">atalhos</span>
+        </>
+      )
+    case 'routine':
+      return (
+        <>
+          <span className="p-glyph">{item.routine.icon}</span>
+          <span className="p-title">{item.routine.name}</span>
+          <span className="p-meta">{item.routine.steps.length} passos</span>
         </>
       )
     case 'open':

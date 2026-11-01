@@ -74,6 +74,14 @@ const api: JarvisApi = {
   projCheckout: (p, b) => ipcRenderer.invoke('proj:checkout', p, b),
   projOpen: (p, app) => ipcRenderer.send('proj:open', p, app),
 
+  autoApps: () => ipcRenderer.invoke('auto:apps'),
+  autoShortcuts: () => ipcRenderer.invoke('auto:shortcuts'),
+  autoRun: (a) => ipcRenderer.invoke('auto:run', a),
+  autoRoutines: () => ipcRenderer.invoke('auto:routines'),
+  autoSaveRoutine: (r) => ipcRenderer.invoke('auto:saveRoutine', r),
+  autoDeleteRoutine: (id) => ipcRenderer.invoke('auto:deleteRoutine', id),
+  autoRunRoutine: (id) => ipcRenderer.invoke('auto:runRoutine', id),
+
   pickDirectory: () => ipcRenderer.invoke('sys:pickDirectory'),
   openInFinder: (p) => ipcRenderer.send('sys:openInFinder', p),
   homeDir: homedir()
