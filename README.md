@@ -3,20 +3,59 @@
 Central de comando nativa para macOS (Electron + React + TypeScript), inspirada no J.A.R.V.I.S.
 Começa organizando as sessões do Claude Code (Desktop e terminal) em workspaces.
 
-## Rodar
+## Instalação
+
+> **Usando o Claude Code?** Abra o Claude na pasta do projeto e peça: *"configure e instale o Jarvis
+> seguindo o README"*. As instruções abaixo são escritas para ele seguir passo a passo.
+
+### Requisitos
+
+| Requisito | Como verificar | Como instalar |
+|---|---|---|
+| macOS em **Apple Silicon** (M1 ou mais novo) | `uname -m` → `arm64` | — (o `.app` é gerado só para arm64; em Intel, apenas `npm run dev`) |
+| **Xcode Command Line Tools** (compilador C++ para o `node-pty` e `swiftc` para o módulo de voz) | `xcode-select -p` e `swiftc --version` | `xcode-select --install` (abre um diálogo do macOS: o usuário precisa confirmar) |
+| **Node.js 22** ou mais novo | `node -v` | `brew install node@22` ou [nvm](https://github.com/nvm-sh/nvm) |
+| **Claude Code CLI** com login feito | `claude --version` | `npm install -g @anthropic-ai/claude-code` e depois `claude` uma vez para fazer login |
+
+O chat do Jarvis usa o `claude` instalado do usuário (mesma conta, settings, CLAUDE.md e MCPs). Sem ele
+o app abre e lista as sessões, mas não conversa.
+
+### Passo a passo
 
 ```bash
-npm install
+npm install          # instala dependências e recompila o node-pty para o Electron (postinstall)
+npm run typecheck    # opcional: confirma que o código compila
+npm run install:app  # compila o módulo de voz, empacota, assina ad-hoc e instala em /Applications
+open "/Applications/Jarvis WorkSpace.app"
+```
+
+`install:app` fecha uma instância aberta do Jarvis e substitui a versão em `/Applications`.
+
+Para desenvolvimento (recarrega ao salvar; usa dados separados e atalhos ⌥⇧⌘J / ⌃⌥⌘J):
+
+```bash
 npm run dev
 ```
 
-## Instalar como app
+### Primeiro uso
 
-```bash
-npm run install:app
-```
+- **Voz (⌥⌘J):** o macOS pede permissão de **Microfone** e **Reconhecimento de Fala** na primeira vez. Só
+  funciona no app instalado, não no `npm run dev`.
+- **Modo escuro / fechar apps** (Automação): o macOS pede permissão para o Jarvis controlar o app em questão.
+- **Workspaces e rotinas** começam vazios — ficam em `~/Library/Application Support/Jarvis WorkSpace/`.
+- **Central de projetos** procura repositórios Git em `~/Documents`, `~/Developer` e `~/Projects`
+  (até 3 níveis), além das pastas das sessões do Claude.
 
-Gera o `.app` (Apple Silicon), assina ad-hoc e instala em `/Applications/Jarvis WorkSpace.app`.
+### Problemas comuns
+
+| Sintoma | Causa / solução |
+|---|---|
+| `npm install` falha em `node-pty` / `gyp` | Faltam as Command Line Tools: `xcode-select --install`, depois `npm install` de novo |
+| `swiftc: command not found` no `install:app` | Mesmo caso acima |
+| "Não encontrei o `claude` no seu PATH" no chat | Instale o Claude Code CLI e confirme `claude --version` num terminal novo |
+| `codesign` reclama de "resource fork, Finder information, or similar detritus" | Já tratado: a assinatura é feita numa pasta temporária. Se persistir, rode `xattr -cr dist` e repita |
+| macOS diz que o app "não pode ser aberto" (`.app` recebido pronto, sem compilar) | `xattr -dr com.apple.quarantine "/Applications/Jarvis WorkSpace.app"` |
+| Voz diz que foi "interrompida pelo macOS" | Permissões negadas: Ajustes → Privacidade e Segurança → Microfone / Reconhecimento de Fala → ativar o Jarvis |
 
 ## Como funciona
 
@@ -25,7 +64,7 @@ Gera o `.app` (Apple Silicon), assina ad-hoc e instala em `/Applications/Jarvis 
   - metadados do Desktop em `~/Library/Application Support/Claude/claude-code-sessions/**/local_*.json`
     (título, arquivada, worktree — ligados pelo campo `cliSessionId`);
   - sessões vivas em `~/.claude/sessions/<pid>.json`.
-  Cache incremental em `~/Library/Application Support/jarvis-workspace/session-index.json`.
+  Cache incremental em `~/Library/Application Support/Jarvis WorkSpace/session-index.json`.
 - **Workspaces** (`src/main/store.ts`) ficam em `workspaces.json` no mesmo diretório e só referenciam IDs de sessão.
   Pastas vinculadas incluem automaticamente as sessões daquele projeto.
 - **Chat** (`src/main/chat.ts`) usa o Claude Agent SDK apontando para o `claude` instalado do usuário
