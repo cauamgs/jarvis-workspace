@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import type { ContextMessage, McpBridgeStatus, MemoryFile, NavRequest, SearchResult, SessionInfo, Workspace } from '@shared/types'
+import type { ContextMessage, MemoryFile, NavRequest, SearchResult, SessionInfo, Workspace } from '@shared/types'
 import { highlightRegex, queryTerms } from '@shared/text'
 import { inWorkspace, shortPath, timeAgo } from '../../lib'
 import { Markdown } from '../Markdown'
 
-type Tab = 'search' | 'notes' | 'mcp'
+type Tab = 'search' | 'notes'
 
 interface Props {
   sessions: SessionInfo[]
@@ -79,7 +79,6 @@ export function MemoryView({ sessions, workspaces, initialQuery, onNavigate }: P
         <div className="tabs">
           <button className={`tab${tab === 'search' ? ' on' : ''}`} onClick={() => setTab('search')}>Conversas</button>
           <button className={`tab${tab === 'notes' ? ' on' : ''}`} onClick={() => setTab('notes')}>Cadernos</button>
-          <button className={`tab${tab === 'mcp' ? ' on' : ''}`} onClick={() => setTab('mcp')}>Conexão</button>
         </div>
 
         {tab === 'search' && (
@@ -150,7 +149,7 @@ export function MemoryView({ sessions, workspaces, initialQuery, onNavigate }: P
         {tab === 'notes' && (
           <div className="panel-body">
             <div className="mem-hint">
-              <p>Cada workspace tem um caderno. Ele entra no início de toda sessão nova do chat do Jarvis daquele projeto, e qualquer sessão do Claude (inclusive as já existentes) pode lê-lo e anotar nele pela conexão.</p>
+              <p>Cada workspace tem um caderno. Ele entra no início de toda sessão nova do chat do Jarvis daquele projeto, e qualquer sessão do Claude (inclusive as já existentes) pode lê-lo e anotar nele pelo servidor MCP do Jarvis (módulo Lab MCP).</p>
             </div>
             {workspaces.length === 0 && <div className="empty">Crie um workspace no módulo Sessões</div>}
             {workspaces.map((w) => (
@@ -162,25 +161,10 @@ export function MemoryView({ sessions, workspaces, initialQuery, onNavigate }: P
           </div>
         )}
 
-        {tab === 'mcp' && (
-          <div className="panel-body">
-            <div className="mem-hint">
-              <p>A conexão dá a qualquer sessão do Claude Code (terminal, Claude Desktop e o chat do Jarvis) ferramentas para consultar esta memória e o seu ambiente.</p>
-            </div>
-            <ul className="mem-tools">
-              <li><b>buscar_conversas</b> · <b>ler_conversa</b> — encontra e lê sessões anteriores</li>
-              <li><b>memoria_workspace</b> · <b>anotar_memoria</b> — lê e escreve no caderno</li>
-              <li><b>contexto_projeto</b> — CLAUDE.md e memórias automáticas</li>
-              <li><b>estado_ambiente</b> · <b>logs_container</b> — git, portas e Docker</li>
-              <li><b>quem_alterou</b> — sessões que editaram um arquivo</li>
-            </ul>
-          </div>
-        )}
       </section>
 
       {tab === 'search' && (hit ? <HitPanel key={hit.uuid} hit={hit} session={byId.get(hit.sessionId)} terms={terms} onNavigate={onNavigate} /> : <IdlePanel />)}
       {tab === 'notes' && (wsId && workspaces.some((w) => w.id === wsId) ? <NotesPanel key={wsId} ws={workspaces.find((w) => w.id === wsId)!} sessions={sessions} /> : <IdlePanel />)}
-      {tab === 'mcp' && <McpPanel />}
     </div>
   )
 }
@@ -356,72 +340,6 @@ function NotesPanel({ ws, sessions }: { ws: Workspace; sessions: SessionInfo[] }
             ))}
           </>
         )}
-      </div>
-    </section>
-  )
-}
-
-function McpPanel(): React.JSX.Element {
-  const [st, setSt] = useState<McpBridgeStatus | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  useEffect(() => {
-    void window.jarvis.mcpBridgeStatus().then(setSt)
-  }, [])
-
-  async function run(fn: () => Promise<{ ok: boolean; status?: McpBridgeStatus; error?: string }>): Promise<void> {
-    setBusy(true)
-    setErr(null)
-    const r = await fn()
-    setBusy(false)
-    if (r.ok && r.status) setSt(r.status)
-    else setErr(r.error ?? 'Falhou.')
-  }
-
-  const state = !st ? '…' : !st.running ? 'SERVIDOR PARADO' : st.registered && st.current ? 'CONECTADO' : st.registered ? 'DESATUALIZADO' : 'NÃO CONECTADO'
-  const ok = st?.running && st.registered && st.current
-
-  return (
-    <section className="panel">
-      <div className="detail-head">
-        <h1>Conexão com o Claude Code</h1>
-        <div className="kv">
-          <span><b>ESTADO</b><span style={{ color: ok ? 'var(--green)' : 'var(--amber)' }}>{state}</span></span>
-          {st && <span><b>SERVIDOR</b>{st.name}</span>}
-          {st && <span><b>ENDEREÇO</b>{st.url}</span>}
-        </div>
-        <div className="actions">
-          {st?.running && (
-            <button className="btn primary" disabled={busy} onClick={() => void run(window.jarvis.mcpBridgeConnect)}>
-              {busy ? 'Aguarde…' : st.registered ? '↻ Reconectar' : '⚡ Conectar ao Claude Code'}
-            </button>
-          )}
-          {st?.registered && (
-            <button className="btn danger" disabled={busy} onClick={() => void run(window.jarvis.mcpBridgeDisconnect)}>
-              Desconectar
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="panel-body mem-mcp">
-        {err && <div className="warn">✕ {err}</div>}
-        {st?.error && <div className="warn">✕ {st.error}</div>}
-        {st?.registered && !st.current && (
-          <div className="warn">O registro no Claude Code aponta para outro endereço ou token. Clique em Reconectar.</div>
-        )}
-        <div className="md">
-          <p>
-            <b>Conectar</b> registra o servidor <code>{st?.name ?? 'jarvis'}</code> nas configurações de usuário do Claude Code
-            (<code>claude mcp add --scope user</code>). A partir daí, toda sessão nova — no terminal, no Claude Desktop ou aqui
-            no Jarvis — passa a ter as ferramentas do Jarvis. Sessões já abertas precisam ser reiniciadas.
-          </p>
-          <p>
-            O servidor só aceita conexões desta máquina com um token secreto, e só funciona enquanto o Jarvis estiver aberto.
-            Os chats do próprio Jarvis já recebem as ferramentas mesmo sem conectar.
-          </p>
-          <p>Experimente pedir numa sessão: <i>"como resolvemos aquele erro de CORS no outro projeto?"</i> ou <i>"anote no caderno que a branch de entrega é develop"</i>.</p>
-        </div>
       </div>
     </section>
   )

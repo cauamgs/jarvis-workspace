@@ -15,6 +15,7 @@ import { SearchIndex } from './search'
 import { MemoryStore, projectContext, workspacesFor } from './memory'
 import { SummaryStore } from './summary'
 import { McpBridge } from './mcp'
+import { McpLab } from './mcpLab'
 import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type {
   ChatEvent,
@@ -25,6 +26,7 @@ import type {
   PermissionMode,
   PermissionResponse,
   AutoAction,
+  McpActivity,
   Routine,
   SessionInfo,
   Workspace
@@ -58,12 +60,23 @@ const bridge = new McpBridge(
     search,
     memory,
     summaries,
-    onMemoryChanged: (wsId) => win?.webContents.send('mem:changed', wsId)
+    onMemoryChanged: (wsId) => win?.webContents.send('mem:changed', wsId),
+    onCall: (a) => {
+      activity.unshift(a)
+      activity.length = Math.min(activity.length, 200)
+      win?.webContents.send('mcp:activity', a)
+    }
   },
   app.isPackaged ? 47821 : 47822,
   join(userData, 'mcp-token'),
   app.isPackaged ? 'jarvis' : 'jarvis-dev'
 )
+const lab = new McpLab(() => {
+  const c = bridge.sdkConfig()
+  return c ? { name: bridge.name, url: c.url, headers: c.headers } : null
+})
+/** Últimas chamadas ao servidor MCP do Jarvis (mais recentes primeiro). */
+const activity: McpActivity[] = []
 const chats = new ChatManager(onChatEvent, chatExtras)
 const palette = new Palette(() => !!win?.isVisible())
 const tray = new JarvisTray({
@@ -409,6 +422,12 @@ function registerIpc(): void {
     }
   })
 
+  ipcMain.handle('lab:servers', () => lab.servers(sessions.map((s) => s.projectPath).filter(Boolean)))
+  ipcMain.handle('lab:tools', (_e, id: string) => lab.tools(id))
+  ipcMain.handle('lab:call', (_e, id: string, tool: string, args: Record<string, unknown>) => lab.call(id, tool, args))
+  ipcMain.handle('lab:disconnect', (_e, id: string) => lab.disconnect(id))
+  ipcMain.handle('mcp:activity', () => activity)
+
   ipcMain.handle('sys:pickDirectory', async () => {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : r.filePaths[0]
@@ -447,6 +466,7 @@ app.on('before-quit', () => {
   watchers.forEach((w) => w.close())
   void indexer.persist()
   void search.persist()
+  lab.closeAll()
   bridge.stop()
 })
 

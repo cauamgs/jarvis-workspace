@@ -106,6 +106,7 @@ export function parseCommand(text: string, ctx: CommandContext): Command | null 
   if (/^(painel (do )?)?sistema|^monitor/.test(rest)) return { req: { type: 'module', id: 'system' }, say: 'Abrindo o painel do sistema.' }
   if (/^(central (de )?)?projetos$/.test(rest)) return { req: { type: 'module', id: 'projects' }, say: 'Abrindo a central de projetos.' }
   if (/^sessoes$/.test(rest)) return { req: { type: 'module', id: 'sessions' }, say: 'Abrindo as sessões.' }
+  if (/^(o )?(lab|laboratorio)( mcp)?$|^mcp$/.test(rest)) return { req: { type: 'module', id: 'lab' }, say: 'Abrindo o laboratório MCP.' }
   if (/^(a )?memoria$/.test(rest)) return { req: { type: 'module', id: 'memory' }, say: 'Abrindo a memória.' }
   if (/^(automac(ao|oes)|rotinas)$/.test(rest)) return { req: { type: 'module', id: 'automation' }, say: 'Abrindo a automação.' }
 

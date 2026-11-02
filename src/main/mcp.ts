@@ -7,7 +7,8 @@ import { join } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
-import type { McpBridgeStatus, SessionInfo, Workspace } from '@shared/types'
+import { randomUUID } from 'node:crypto'
+import type { McpActivity, McpBridgeStatus, SessionInfo, Workspace } from '@shared/types'
 import type { SearchIndex } from './search'
 import { type MemoryStore, projectContext, workspacesFor } from './memory'
 import type { SummaryStore } from './summary'
@@ -28,6 +29,8 @@ export interface McpContext {
   memory: MemoryStore
   summaries: SummaryStore
   onMemoryChanged: (wsId: string) => void
+  /** Cada chamada de ferramenta (para o registro de atividade do Laboratório MCP). */
+  onCall: (a: McpActivity) => void
 }
 
 const INSTRUCTIONS = `Jarvis WorkSpace é a central de trabalho do usuário: conhece todas as sessões do Claude Code dele
@@ -41,8 +44,24 @@ const INSTRUCTIONS = `Jarvis WorkSpace é a central de trabalho do usuário: con
 const text = (t: string): { content: { type: 'text'; text: string }[] } => ({ content: [{ type: 'text', text: t }] })
 const date = (ms: number): string => (ms ? new Date(ms).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '?')
 
-function buildServer(ctx: McpContext): McpServer {
+function buildServer(ctx: McpContext, fromLab: boolean): McpServer {
   const server = new McpServer({ name: 'jarvis', version: '0.1.0' }, { instructions: INSTRUCTIONS })
+  // Registra toda chamada: o que o Claude pediu, quanto levou e o começo da resposta.
+  const register = server.registerTool.bind(server) as (...a: any[]) => any
+  ;(server as any).registerTool = (name: string, cfg: unknown, handler: (args: any, extra: any) => Promise<any>) =>
+    register(name, cfg, async (args: any, extra: any) => {
+      const t0 = Date.now()
+      const log = (ok: boolean, preview: string): void =>
+        ctx.onCall({ id: randomUUID(), at: t0, tool: name, args: JSON.stringify(args ?? {}), ms: Date.now() - t0, ok, preview: preview.slice(0, 400), fromLab })
+      try {
+        const r = await handler(args, extra)
+        log(!r?.isError, String(r?.content?.[0]?.text ?? ''))
+        return r
+      } catch (err) {
+        log(false, err instanceof Error ? err.message : String(err))
+        throw err
+      }
+    })
   const sessionById = (id: string): SessionInfo | undefined => ctx.sessions().find((s) => s.id === id || s.id.startsWith(id))
 
   server.registerTool(
@@ -301,7 +320,7 @@ export class McpBridge {
         res.writeHead(405, { Allow: 'POST' }).end()
         return
       }
-      const server = buildServer(this.ctx)
+      const server = buildServer(this.ctx, req.headers['x-jarvis-lab'] === '1')
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
       res.on('close', () => {
         void transport.close()

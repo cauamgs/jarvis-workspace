@@ -105,10 +105,16 @@ npm run dev
   - **Resumo de passagem:** botão ✦ Resumo na sessão. Uma chamada avulsa ao Claude (sem ferramentas, sem gravar
     sessão) escreve objetivo, o que foi feito, decisões, estado e próximos passos; "Continuar em nova sessão" abre uma
     sessão limpa a partir dele. Guardado em `summaries/`.
+  - O servidor MCP do Jarvis expõe tudo isso ao Claude (ver Lab MCP).
+- **Lab MCP** (`src/main/mcp.ts`, `src/main/mcpLab.ts`, módulo Lab MCP):
   - **Servidor MCP do Jarvis:** HTTP em `127.0.0.1:47821/mcp` (dev: 47822) com token (`mcp-token`). Ferramentas:
     `buscar_conversas`, `ler_conversa`, `memoria_workspace`, `anotar_memoria`, `contexto_projeto`,
     `estado_ambiente`, `logs_container`, `quem_alterou`. Os chats do Jarvis já o recebem; "Conectar ao Claude Code"
-    (aba Conexão) roda `claude mcp add --scope user` para que sessões do terminal e do Desktop também o tenham.
+    roda `claude mcp add --scope user` para que sessões do terminal e do Desktop também o tenham.
     Só funciona com o Jarvis aberto.
+  - **Atividade:** cada ferramenta que o Claude chamou no servidor do Jarvis, com argumentos, tempo e resposta.
+  - **Servidores do Claude Code:** lista (só leitura, segredos mascarados) os servidores dos escopos usuário e local
+    (`~/.claude.json`) e dos `.mcp.json` dos projetos; conecta como cliente (stdio, HTTP ou SSE) para listar e testar
+    ferramentas com um formulário gerado do schema. Ferramentas que não são somente leitura pedem confirmação.
 
 Os formatos do Claude são internos e podem mudar — o Jarvis nunca escreve neles.

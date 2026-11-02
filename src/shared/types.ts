@@ -303,7 +303,7 @@ export type NavRequest =
   | { type: 'session'; id: string; send?: string; voice?: boolean }
   | { type: 'workspace'; id: string }
   | { type: 'new'; cwd: string; workspaceId?: string; text?: string; voice?: boolean }
-  | { type: 'module'; id: 'sessions' | 'system' | 'projects' | 'automation' | 'memory' }
+  | { type: 'module'; id: 'sessions' | 'system' | 'projects' | 'automation' | 'memory' | 'lab' }
   | { type: 'search'; query: string }
   | { type: 'project'; path: string }
 
@@ -363,6 +363,47 @@ export interface McpBridgeStatus {
   registered: boolean
   /** Registro aponta para este endereço e token. */
   current: boolean
+}
+
+export interface McpServerEntry {
+  id: string
+  name: string
+  /** jarvis = o servidor do próprio app; user/local/project = escopos do Claude Code. */
+  scope: 'jarvis' | 'user' | 'local' | 'project'
+  project?: string
+  transport: 'http' | 'sse' | 'stdio'
+  /** URL ou linha de comando. */
+  target: string
+  /** Configuração com segredos mascarados. */
+  config: Record<string, unknown>
+}
+
+export interface McpToolInfo {
+  name: string
+  title?: string
+  description?: string
+  inputSchema: Record<string, unknown>
+  readOnly?: boolean
+  destructive?: boolean
+}
+
+export interface McpCallResult {
+  ok: boolean
+  isError?: boolean
+  text: string
+  ms: number
+}
+
+export interface McpActivity {
+  id: string
+  at: number
+  tool: string
+  args: string
+  ms: number
+  ok: boolean
+  preview: string
+  /** Chamada feita pelo próprio Laboratório (teste manual). */
+  fromLab: boolean
 }
 
 export interface JarvisApi {
@@ -466,6 +507,12 @@ export interface JarvisApi {
   mcpBridgeStatus(): Promise<McpBridgeStatus>
   mcpBridgeConnect(): Promise<{ ok: boolean; status?: McpBridgeStatus; error?: string }>
   mcpBridgeDisconnect(): Promise<{ ok: boolean; status?: McpBridgeStatus; error?: string }>
+  labServers(): Promise<McpServerEntry[]>
+  labTools(id: string): Promise<{ ok: boolean; tools?: McpToolInfo[]; instructions?: string; error?: string }>
+  labCall(id: string, tool: string, args: Record<string, unknown>): Promise<McpCallResult>
+  labDisconnect(id: string): Promise<void>
+  mcpActivity(): Promise<McpActivity[]>
+  onMcpActivity(cb: (a: McpActivity) => void): () => void
 
   pickDirectory(): Promise<string | null>
   openInFinder(path: string): void

@@ -94,6 +94,12 @@ const api: JarvisApi = {
   mcpBridgeStatus: () => ipcRenderer.invoke('mcp:status'),
   mcpBridgeConnect: () => ipcRenderer.invoke('mcp:connect'),
   mcpBridgeDisconnect: () => ipcRenderer.invoke('mcp:disconnect'),
+  labServers: () => ipcRenderer.invoke('lab:servers'),
+  labTools: (id) => ipcRenderer.invoke('lab:tools', id),
+  labCall: (id, t, a) => ipcRenderer.invoke('lab:call', id, t, a),
+  labDisconnect: (id) => ipcRenderer.invoke('lab:disconnect', id),
+  mcpActivity: () => ipcRenderer.invoke('mcp:activity'),
+  onMcpActivity: (cb) => subscribe('mcp:activity', cb),
 
   pickDirectory: () => ipcRenderer.invoke('sys:pickDirectory'),
   openInFinder: (p) => ipcRenderer.send('sys:openInFinder', p),

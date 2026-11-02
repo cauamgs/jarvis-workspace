@@ -15,6 +15,7 @@ import { SystemView } from './components/system/SystemView'
 import { ProjectsView } from './components/projects/ProjectsView'
 import { AutomationView } from './components/automation/AutomationView'
 import { MemoryView } from './components/memory/MemoryView'
+import { LabView } from './components/lab/LabView'
 import { SummaryModal } from './components/SummaryModal'
 import { inWorkspace, uuid } from './lib'
 
@@ -250,6 +251,7 @@ export default function App(): React.JSX.Element {
           <ModuleRail active={module} onChange={setModule} />
           {module === 'system' && <SystemView />}
           {module === 'automation' && <AutomationView />}
+          {module === 'lab' && <LabView />}
           {module === 'memory' && (
             <MemoryView
               sessions={all}

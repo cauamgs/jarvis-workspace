@@ -1,11 +1,12 @@
-export type ModuleId = 'sessions' | 'memory' | 'system' | 'projects' | 'automation'
+export type ModuleId = 'sessions' | 'memory' | 'system' | 'projects' | 'automation' | 'lab'
 
 const MODULES: { id: ModuleId | 'projects'; icon: string; label: string; soon?: boolean }[] = [
   { id: 'sessions', icon: '◈', label: 'Sessões' },
   { id: 'memory', icon: '❖', label: 'Memória' },
   { id: 'system', icon: '◔', label: 'Sistema' },
   { id: 'projects', icon: '⎇', label: 'Projetos' },
-  { id: 'automation', icon: '⚡', label: 'Automação' }
+  { id: 'automation', icon: '⚡', label: 'Automação' },
+  { id: 'lab', icon: '⚗', label: 'Lab MCP' }
 ]
 
 /** Barra vertical de módulos do Jarvis — cada ferramenta nova ganha um ícone aqui. */
