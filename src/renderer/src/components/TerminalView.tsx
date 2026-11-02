@@ -30,12 +30,12 @@ export function TerminalView(p: Props): React.JSX.Element {
       macOptionIsMeta: true,
       theme: {
         background: '#00000000',
-        foreground: '#c6f4ff',
+        foreground: '#e6e7e9',
         cursor: '#00e5ff',
-        cursorAccent: '#02070d',
-        selectionBackground: 'rgba(0, 229, 255, 0.3)',
-        black: '#02121d',
-        brightBlack: '#3c6577',
+        cursorAccent: '#0c0c0d',
+        selectionBackground: 'rgba(0, 229, 255, 0.22)',
+        black: '#1a1a1c',
+        brightBlack: '#63666c',
         blue: '#4d8dff',
         brightBlue: '#7fb0ff',
         cyan: '#00e5ff',
@@ -48,7 +48,7 @@ export function TerminalView(p: Props): React.JSX.Element {
         brightRed: '#ff8ea1',
         magenta: '#b98bff',
         brightMagenta: '#d6b9ff',
-        white: '#c6f4ff',
+        white: '#e6e7e9',
         brightWhite: '#ffffff'
       }
     })
