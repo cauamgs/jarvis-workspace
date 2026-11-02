@@ -406,6 +406,18 @@ export interface McpActivity {
   fromLab: boolean
 }
 
+/** Arquivo entregue pelo Claude (SendUserFile / enviar_arquivo). */
+export interface DeliveredFile {
+  path: string
+  name: string
+  ext: string
+  kind: 'image' | 'video' | 'audio' | 'pdf' | 'html' | 'text' | 'other'
+  mime: string
+  exists: boolean
+  size: number
+  mtime?: number
+}
+
 export interface JarvisApi {
   listSessions(): Promise<SessionInfo[]>
   getTranscript(sessionId: string): Promise<TranscriptMessage[]>
@@ -507,6 +519,12 @@ export interface JarvisApi {
   mcpBridgeStatus(): Promise<McpBridgeStatus>
   mcpBridgeConnect(): Promise<{ ok: boolean; status?: McpBridgeStatus; error?: string }>
   mcpBridgeDisconnect(): Promise<{ ok: boolean; status?: McpBridgeStatus; error?: string }>
+  fileInfo(paths: string[]): Promise<DeliveredFile[]>
+  fileText(path: string): Promise<string>
+  fileOpen(path: string): void
+  fileReveal(path: string): void
+  /** URL para exibir um arquivo entregue (imagem, vídeo, áudio, PDF). */
+  fileUrl(path: string): string
   labServers(): Promise<McpServerEntry[]>
   labTools(id: string): Promise<{ ok: boolean; tools?: McpToolInfo[]; instructions?: string; error?: string }>
   labCall(id: string, tool: string, args: Record<string, unknown>): Promise<McpCallResult>

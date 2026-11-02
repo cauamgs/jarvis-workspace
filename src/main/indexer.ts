@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import type { SessionInfo, TranscriptBlock, TranscriptMessage } from '@shared/types'
+import { allowFiles, deliveryPaths, isDeliveryTool } from './files'
 
 /**
  * Lê (somente leitura) as sessões do Claude Code:
@@ -282,7 +283,9 @@ export function toMessage(d: any): TranscriptMessage | null {
     for (const c of content) {
       if (c.type === 'text' && c.text) blocks.push({ kind: 'text', text: c.text })
       else if (c.type === 'thinking' && c.thinking) blocks.push({ kind: 'thinking', text: c.thinking })
-      else if (c.type === 'tool_use')
+      else if (c.type === 'tool_use') {
+        // Arquivos entregues ao usuário passam a poder ser exibidos na interface.
+        if (isDeliveryTool(c.name)) allowFiles(deliveryPaths(c.input))
         blocks.push({
           kind: 'tool_use',
           id: c.id,
@@ -290,6 +293,7 @@ export function toMessage(d: any): TranscriptMessage | null {
           input: summarizeInput(c.input),
           raw: clampDeep(c.input) as Record<string, unknown>
         })
+      }
       else if (c.type === 'tool_result')
         blocks.push({
           kind: 'tool_result',

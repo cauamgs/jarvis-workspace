@@ -95,6 +95,11 @@ npm run dev
 - **Automação do Mac** (`src/main/automation.ts`): abrir apps, Atalhos do macOS, volume, aparência, dormir a
   tela e rotinas com vários passos, disparadas pela busca, por voz ou pelo módulo Automação.
 
+- **Arquivos entregues** (`src/main/files.ts`, `FileCards.tsx`): arquivos que o Claude entrega aparecem na conversa
+  com prévia — imagem, vídeo e áudio (com avanço via Range), PDF, texto/código — e botões Abrir/Finder. Vale para o
+  `SendUserFile` do Claude Desktop (histórico) e para a ferramenta `enviar_arquivo` do servidor MCP do Jarvis (os
+  chats do Jarvis não têm o `SendUserFile`). Só caminhos que apareceram numa entrega podem ser lidos, pelo
+  protocolo interno `jarvis-file://`.
 - **Memória** (`src/main/search.ts`, `memory.ts`, `summary.ts`, `mcp.ts`, módulo Memória na interface):
   - **Busca nas conversas:** índice de texto de todas as sessões (pedidos, respostas e um resumo de cada ferramenta,
     sem resultados de ferramentas), incremental e guardado em `search/`. Termos sem acento/maiúscula, "frase exata".
@@ -109,7 +114,8 @@ npm run dev
 - **Lab MCP** (`src/main/mcp.ts`, `src/main/mcpLab.ts`, módulo Lab MCP):
   - **Servidor MCP do Jarvis:** HTTP em `127.0.0.1:47821/mcp` (dev: 47822) com token (`mcp-token`). Ferramentas:
     `buscar_conversas`, `ler_conversa`, `memoria_workspace`, `anotar_memoria`, `contexto_projeto`,
-    `estado_ambiente`, `logs_container`, `quem_alterou`. Os chats do Jarvis já o recebem; "Conectar ao Claude Code"
+    `estado_ambiente`, `logs_container`, `quem_alterou`, `enviar_arquivo`. Nos chats do Jarvis as ferramentas de leitura
+    rodam sem pedir permissão (`anotar_memoria` pede). Os chats do Jarvis já o recebem; "Conectar ao Claude Code"
     roda `claude mcp add --scope user` para que sessões do terminal e do Desktop também o tenham.
     Só funciona com o Jarvis aberto.
   - **Atividade:** cada ferramenta que o Claude chamou no servidor do Jarvis, com argumentos, tempo e resposta.

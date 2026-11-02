@@ -100,7 +100,7 @@ export class ChatManager {
   constructor(
     private emit: (key: string, ev: ChatEvent) => void,
     /** Extras de cada sessão nova: servidor MCP do Jarvis e memória dos workspaces da pasta. */
-    private extras: (cwd: string) => Promise<{ mcpServers?: Record<string, McpServerConfig>; appendPrompt?: string }> = async () => ({})
+    private extras: (cwd: string) => Promise<{ mcpServers?: Record<string, McpServerConfig>; appendPrompt?: string; allowedTools?: string[] }> = async () => ({})
   ) {}
 
   active(): string[] {
@@ -192,6 +192,7 @@ export class ChatManager {
         env,
         systemPrompt: { type: 'preset', preset: 'claude_code', append: extras.appendPrompt },
         mcpServers: extras.mcpServers,
+        allowedTools: extras.allowedTools,
         includePartialMessages: true,
         permissionMode: o.permissionMode,
         allowDangerouslySkipPermissions: true,

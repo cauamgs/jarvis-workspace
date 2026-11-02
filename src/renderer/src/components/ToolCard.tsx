@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { TranscriptBlock, TranscriptMessage } from '@shared/types'
 import { Markdown } from './Markdown'
+import { FileCards } from './FileCards'
 
 type ToolUse = Extract<TranscriptBlock, { kind: 'tool_use' }>
 type ToolResult = Extract<TranscriptBlock, { kind: 'tool_result' }>
@@ -74,7 +75,23 @@ export function statusLabel(s: string): string {
 /** Ferramentas de "bastidor" que viram uma linha discreta (o painel de plano já mostra o essencial). */
 const QUIET = new Set(['TaskCreate', 'TaskUpdate', 'TaskList', 'TaskGet', 'TodoWrite', 'ToolSearch', 'AskUserQuestion', 'ExitPlanMode'])
 
-export function ToolCard({ tool, result, running, subagent }: Props): React.JSX.Element {
+const isDelivery = (name: string): boolean => name === 'SendUserFile' || name.endsWith('__enviar_arquivo')
+
+/** Caminhos de uma entrega de arquivos (SendUserFile usa "files"; enviar_arquivo usa "arquivos"). */
+function deliveryPaths(raw: Record<string, unknown> | undefined): string[] {
+  const v = raw?.files ?? raw?.arquivos
+  return (Array.isArray(v) ? v : typeof v === 'string' ? [v] : []).filter((p): p is string => typeof p === 'string')
+}
+
+export function ToolCard(props: Props): React.JSX.Element {
+  // Entregas de arquivos aparecem como prévia, não como cartão de ferramenta.
+  const paths = isDelivery(props.tool.name) ? deliveryPaths(props.tool.raw) : []
+  if (paths.length && !props.result?.isError)
+    return <FileCards paths={paths} caption={str(props.tool.raw?.caption ?? props.tool.raw?.legenda) || undefined} />
+  return <ToolCardInner {...props} />
+}
+
+function ToolCardInner({ tool, result, running, subagent }: Props): React.JSX.Element {
   const d = describe(tool)
   const diff = tool.name === 'Edit' ? lineDiff(str(tool.raw?.old_string), str(tool.raw?.new_string)) : null
   const [open, setOpen] = useState(() => (diff ? diff.length <= 24 : false) || !!result?.isError)

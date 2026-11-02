@@ -15,6 +15,7 @@ import type { SummaryStore } from './summary'
 import * as projects from './projects'
 import * as system from './system'
 import { loginShellEnv } from './shellEnv'
+import { allowFiles, validateDelivery } from './files'
 
 /**
  * Servidor MCP do Jarvis (HTTP em 127.0.0.1): dá a qualquer sessão do Claude Code — terminal,
@@ -38,6 +39,8 @@ const INSTRUCTIONS = `Jarvis WorkSpace é a central de trabalho do usuário: con
 - Quando o usuário citar trabalho anterior ("como resolvemos…", "naquela sessão…", "o que decidimos sobre…"),
   use buscar_conversas e depois ler_conversa para recuperar o contexto, em vez de pedir que ele repita.
 - No começo de uma tarefa num projeto, consulte memoria_workspace com o diretório atual.
+- Quando gerar um arquivo para o usuário ver (relatório, PDF, imagem, vídeo, planilha, página), entregue com
+  enviar_arquivo: o Jarvis mostra a prévia na conversa.
 - Registre com anotar_memoria decisões duráveis, convenções e informações de ambiente que valham para
   sessões futuras (não registre segredos nem detalhes passageiros).`
 
@@ -248,6 +251,27 @@ function buildServer(ctx: McpContext, fromLab: boolean): McpServer {
       const out = await system.dockerLogs(container)
       if (!out) return text('Sem logs (container inexistente ou nome inválido).')
       return text(out.split('\n').slice(-(linhas ?? 120)).join('\n'))
+    }
+  )
+
+  server.registerTool(
+    'enviar_arquivo',
+    {
+      title: 'Enviar arquivo ao usuário',
+      description:
+        'Entrega arquivos ao usuário no Jarvis WorkSpace, que mostra a prévia na conversa (imagem, vídeo, áudio, PDF, ' +
+        'texto/código) com botões para abrir e mostrar no Finder. Use para entregáveis: relatórios, imagens, vídeos, planilhas.',
+      inputSchema: {
+        arquivos: z.array(z.string()).min(1).max(20).describe('Caminhos absolutos dos arquivos'),
+        legenda: z.string().max(500).optional().describe('Uma linha de contexto, ex.: "versão final em 1080p"')
+      },
+      annotations: { readOnlyHint: true }
+    },
+    async ({ arquivos }) => {
+      const { ok, errors } = await validateDelivery(arquivos)
+      allowFiles(ok)
+      if (!ok.length) return { ...text(`Nenhum arquivo entregue:\n${errors.join('\n')}`), isError: true }
+      return text(`${ok.length} arquivo(s) entregue(s) ao usuário.${errors.length ? `\nIgnorados:\n${errors.join('\n')}` : ''}`)
     }
   )
 

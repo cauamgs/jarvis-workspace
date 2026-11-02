@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Notification, shell } from 'electron'
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Notification, protocol, shell } from 'electron'
 import { mkdirSync, promises as fsp, watch, type FSWatcher } from 'node:fs'
 import { join } from 'node:path'
 import { ChatManager, forkSession, renameSession } from './chat'
@@ -16,6 +16,7 @@ import { MemoryStore, projectContext, workspacesFor } from './memory'
 import { SummaryStore } from './summary'
 import { McpBridge } from './mcp'
 import { McpLab } from './mcpLab'
+import * as files from './files'
 import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type {
   ChatEvent,
@@ -31,6 +32,11 @@ import type {
   SessionInfo,
   Workspace
 } from '@shared/types'
+
+// Protocolo para exibir arquivos entregues pelo Claude (com suporte a Range, para avançar em vídeos).
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'jarvis-file', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+])
 
 let win: BrowserWindow | null = null
 let quitting = false
@@ -116,7 +122,10 @@ async function refreshSessions(): Promise<SessionInfo[]> {
  * Chats do Jarvis recebem o servidor MCP do próprio Jarvis e o caderno dos workspaces da pasta
  * (sessões do terminal e do Desktop leem o caderno pela ferramenta memoria_workspace).
  */
-async function chatExtras(cwd: string): Promise<{ mcpServers?: Record<string, McpServerConfig>; appendPrompt?: string }> {
+// Ferramentas do Jarvis que só leem (ou só mostram um arquivo) não pedem permissão nos chats do Jarvis.
+const JARVIS_READ_TOOLS = ['buscar_conversas', 'ler_conversa', 'memoria_workspace', 'contexto_projeto', 'estado_ambiente', 'logs_container', 'quem_alterou', 'enviar_arquivo']
+
+async function chatExtras(cwd: string): Promise<{ mcpServers?: Record<string, McpServerConfig>; appendPrompt?: string; allowedTools?: string[] }> {
   const mcp = bridge.sdkConfig()
   const notes = await Promise.all(
     workspacesFor(cwd, store.list(), sessions).map(async (w) => {
@@ -127,6 +136,7 @@ async function chatExtras(cwd: string): Promise<{ mcpServers?: Record<string, Mc
   const body = notes.filter(Boolean).join('\n\n')
   return {
     mcpServers: mcp ? { [bridge.name]: mcp } : undefined,
+    allowedTools: mcp ? JARVIS_READ_TOOLS.map((t) => `mcp__${bridge.name}__${t}`) : undefined,
     appendPrompt: body
       ? `# Memória dos workspaces (Jarvis WorkSpace)\nNotas registradas pelo usuário e por sessões anteriores para este projeto:\n\n${body}`
       : undefined
@@ -422,6 +432,11 @@ function registerIpc(): void {
     }
   })
 
+  ipcMain.handle('file:info', (_e, paths: string[]) => files.fileInfo(paths))
+  ipcMain.handle('file:text', (_e, p: string) => files.fileText(p))
+  ipcMain.on('file:open', (_e, p: string) => files.isAllowed(p) && void shell.openPath(p))
+  ipcMain.on('file:reveal', (_e, p: string) => files.isAllowed(p) && shell.showItemInFolder(p))
+
   ipcMain.handle('lab:servers', () => lab.servers(sessions.map((s) => s.projectPath).filter(Boolean)))
   ipcMain.handle('lab:tools', (_e, id: string) => lab.tools(id))
   ipcMain.handle('lab:call', (_e, id: string, tool: string, args: Record<string, unknown>) => lab.call(id, tool, args))
@@ -444,6 +459,9 @@ app.whenReady().then(async () => {
   await Promise.all([indexer.load(), store.load(), routines.load(), search.load()])
   await bridge.start()
   registerIpc()
+  protocol.handle('jarvis-file', (req) =>
+    files.serveFile(decodeURIComponent(new URL(req.url).pathname.slice(1)), req.headers.get('range'))
+  )
   createWindow()
   palette.create()
   // Garante o modo normal de app: ícone no Dock, menu e ⌘Tab.

@@ -1492,3 +1492,20 @@ mark { background: rgba(255, 182, 39, 0.22); color: #fff; border-radius: 2px; pa
 .lab-act .meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
 .lab-act .lab-pre { margin: 0 16px 10px; }
 .labview .proj-meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+
+/* ---------- arquivos entregues ---------- */
+.deliv { display: grid; gap: 8px; margin: 6px 0; max-width: 620px; }
+.deliv-caption { color: var(--text); font-size: 15px; }
+.deliv-card { border: 1px solid var(--line); background: var(--panel-solid); overflow: hidden; }
+.deliv-head { display: flex; align-items: center; gap: 10px; padding: 8px 10px; font-size: 13.5px; }
+.deliv-card:not(.compact) .deliv-head { border-bottom: 1px solid var(--line); }
+.deliv-ext { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.08em; padding: 1px 6px; border: 1px solid var(--line); color: var(--text-dim); border-radius: 3px; }
+.deliv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.deliv-size { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); white-space: nowrap; }
+.deliv-media { display: block; max-width: 100%; max-height: 380px; margin: 0 auto; background: #000; cursor: zoom-in; }
+video.deliv-media { cursor: default; width: 100%; }
+.deliv-audio { display: block; width: calc(100% - 20px); margin: 10px; }
+.deliv-pdf { display: block; width: 100%; height: 420px; border: none; background: #fff; }
+.deliv-text { margin: 0; padding: 10px 12px; font-family: var(--font-mono); font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 520px; overflow-y: auto; user-select: text; color: var(--text); }
+.deliv-more { display: block; width: 100%; padding: 6px; background: none; border: none; border-top: 1px solid var(--line); color: var(--cyan); font-family: var(--font-mono); font-size: 11px; cursor: pointer; }
+.deliv-more:hover { background: var(--hover); }
