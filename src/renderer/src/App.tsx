@@ -14,6 +14,8 @@ import { ModuleRail, type ModuleId } from './components/ModuleRail'
 import { SystemView } from './components/system/SystemView'
 import { ProjectsView } from './components/projects/ProjectsView'
 import { AutomationView } from './components/automation/AutomationView'
+import { MemoryView } from './components/memory/MemoryView'
+import { SummaryModal } from './components/SummaryModal'
 import { inWorkspace, uuid } from './lib'
 
 interface TermSpec {
@@ -39,6 +41,8 @@ export default function App(): React.JSX.Element {
   const [liveWarn, setLiveWarn] = useState<string | null>(null)
   const [module, setModule] = useState<ModuleId>('sessions')
   const [projectFocus, setProjectFocus] = useState<string | undefined>()
+  const [memoryQuery, setMemoryQuery] = useState<{ q: string; n: number } | undefined>()
+  const [summaryFor, setSummaryFor] = useState<SessionInfo | null>(null)
   const activeChats = useActiveChats()
   /** Sessões com algo rodando dentro do Jarvis (terminal ou chat). */
   const inJarvis = useMemo(() => new Set([...terminals.keys(), ...activeChats]), [terminals, activeChats])
@@ -196,6 +200,10 @@ export default function App(): React.JSX.Element {
       case 'module':
         setModule(req.id)
         return
+      case 'search':
+        setMemoryQuery({ q: req.query, n: Date.now() })
+        setModule('memory')
+        return
       case 'workspace':
         setModule('sessions')
         setQuery('')
@@ -242,6 +250,14 @@ export default function App(): React.JSX.Element {
           <ModuleRail active={module} onChange={setModule} />
           {module === 'system' && <SystemView />}
           {module === 'automation' && <AutomationView />}
+          {module === 'memory' && (
+            <MemoryView
+              sessions={all}
+              workspaces={workspaces}
+              initialQuery={memoryQuery}
+              onNavigate={(req) => void navRef.current(req)}
+            />
+          )}
           {module === 'projects' && <ProjectsView focusPath={projectFocus} onNavigate={(req) => void navRef.current(req)} />}
         <div className="main" style={module === 'sessions' ? undefined : { display: 'none' }}>
           <Sidebar
@@ -287,6 +303,7 @@ export default function App(): React.JSX.Element {
                     }
                   }}
                   onToggleWorkspace={(wsId, on) => void assign(wsId, selected.id, on)}
+                  onSummary={() => setSummaryFor(selected)}
                 />
                 {liveWarn === selected.id && (
                   <div className="warn">
@@ -372,6 +389,22 @@ export default function App(): React.JSX.Element {
             setWorkspaces(await window.jarvis.deleteWorkspace(id))
             setModal(null)
             if (view.kind === 'ws' && view.id === id) setView({ kind: 'all' })
+          }}
+        />
+      )}
+      {summaryFor && (
+        <SummaryModal
+          session={summaryFor}
+          onClose={() => setSummaryFor(null)}
+          onContinue={(text) => {
+            const base = summaryFor
+            setSummaryFor(null)
+            setModule('sessions')
+            void newSession({
+              cwd: base.cwd || base.projectPath,
+              workspaceId: workspaces.find((w) => inWorkspace(w, base))?.id,
+              text
+            })
           }}
         />
       )}

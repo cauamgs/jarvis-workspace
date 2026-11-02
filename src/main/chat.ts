@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import type {
   CanUseTool,
+  McpServerConfig,
   PermissionResult,
   PermissionUpdate,
   Query,
@@ -96,7 +97,11 @@ export interface ChatInfo {
 export class ChatManager {
   private sessions = new Map<string, ChatSession>()
 
-  constructor(private emit: (key: string, ev: ChatEvent) => void) {}
+  constructor(
+    private emit: (key: string, ev: ChatEvent) => void,
+    /** Extras de cada sessão nova: servidor MCP do Jarvis e memória dos workspaces da pasta. */
+    private extras: (cwd: string) => Promise<{ mcpServers?: Record<string, McpServerConfig>; appendPrompt?: string }> = async () => ({})
+  ) {}
 
   active(): string[] {
     return [...this.sessions.keys()]
@@ -155,7 +160,7 @@ export class ChatManager {
 
   private async start(o: ChatSendOptions): Promise<ChatSession> {
     this.emit(o.key, { type: 'state', state: 'starting' })
-    const [{ query }, { env, claudePath }] = await Promise.all([loadSdk(), loginShellEnv()])
+    const [{ query }, { env, claudePath }, extras] = await Promise.all([loadSdk(), loginShellEnv(), this.extras(o.cwd)])
     if (!claudePath) throw new Error('Não encontrei o `claude` no seu PATH. Instale o Claude Code CLI.')
     // Nunca rodar o Claude num diretório diferente do da sessão (ex.: cair na pasta pessoal).
     if (!existsSync(o.cwd)) throw new Error(`A pasta desta sessão não existe mais: ${o.cwd}`)
@@ -185,7 +190,8 @@ export class ChatManager {
         sessionId: o.newSessionId,
         pathToClaudeCodeExecutable: claudePath,
         env,
-        systemPrompt: { type: 'preset', preset: 'claude_code' },
+        systemPrompt: { type: 'preset', preset: 'claude_code', append: extras.appendPrompt },
+        mcpServers: extras.mcpServers,
         includePartialMessages: true,
         permissionMode: o.permissionMode,
         allowDangerouslySkipPermissions: true,

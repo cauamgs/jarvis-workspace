@@ -82,6 +82,19 @@ const api: JarvisApi = {
   autoDeleteRoutine: (id) => ipcRenderer.invoke('auto:deleteRoutine', id),
   autoRunRoutine: (id) => ipcRenderer.invoke('auto:runRoutine', id),
 
+  searchConversations: (q, o) => ipcRenderer.invoke('mem:search', q, o),
+  searchContext: (id, u, r) => ipcRenderer.invoke('mem:context', id, u, r),
+  memoryGet: (ws) => ipcRenderer.invoke('mem:get', ws),
+  memorySet: (ws, t) => ipcRenderer.invoke('mem:set', ws, t),
+  memoryAppend: (ws, n) => ipcRenderer.invoke('mem:append', ws, n),
+  onMemoryChanged: (cb) => subscribe('mem:changed', cb),
+  projectContext: (p) => ipcRenderer.invoke('mem:projectContext', p),
+  summaryGet: (id) => ipcRenderer.invoke('summary:get', id),
+  summaryGenerate: (id) => ipcRenderer.invoke('summary:generate', id),
+  mcpBridgeStatus: () => ipcRenderer.invoke('mcp:status'),
+  mcpBridgeConnect: () => ipcRenderer.invoke('mcp:connect'),
+  mcpBridgeDisconnect: () => ipcRenderer.invoke('mcp:disconnect'),
+
   pickDirectory: () => ipcRenderer.invoke('sys:pickDirectory'),
   openInFinder: (p) => ipcRenderer.send('sys:openInFinder', p),
   homeDir: homedir()

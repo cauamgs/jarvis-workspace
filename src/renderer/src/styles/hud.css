@@ -1416,3 +1416,47 @@ tr:hover .row-btn, .ctr:hover .row-btn, .row-btn.armed { opacity: 1; }
 .editor-foot { display: flex; gap: 8px; padding: 10px 18px 14px; border-top: 1px solid var(--cyan-line); }
 .auto-results { cursor: pointer; }
 .step select.step-target { width: auto; flex: 1; max-width: none; }
+
+/* ---------- memória ---------- */
+.memview { display: grid; grid-template-columns: 440px minmax(0, 1fr); gap: 12px; padding-right: 12px; min-height: 0; }
+.mem-search { border-bottom: none; padding-bottom: 6px; }
+.mem-filters { display: flex; gap: 6px; align-items: center; padding: 0 12px 10px; border-bottom: 1px solid var(--line); }
+.mem-filters .select { flex: 1; min-width: 0; }
+.mem-hint { padding: 14px 18px 4px; color: var(--text-dim); font-size: 14px; line-height: 1.45; }
+.mem-hint p { margin: 0 0 10px; }
+.mem-hint b { color: var(--cyan-2); font-weight: 500; }
+.mem-group { border-bottom: 1px solid var(--line-soft); padding: 8px 0 6px; }
+.mem-group-head { display: flex; align-items: baseline; gap: 10px; padding: 0 16px 4px; }
+.mem-group-head .t { flex: 1; min-width: 0; font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mem-group-head .m { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
+.mem-hit { display: flex; gap: 10px; padding: 5px 16px 5px 18px; cursor: pointer; font-size: 13.5px; line-height: 1.4; color: var(--text-dim); border-left: 2px solid transparent; }
+.mem-hit:hover { background: var(--hover); color: var(--text); }
+.mem-hit.on { background: rgba(0, 229, 255, 0.07); border-left-color: var(--cyan); color: var(--text); }
+.mem-hit .who { flex: none; width: 46px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.12em; padding-top: 2px; }
+.mem-hit .who.user { color: var(--amber); }
+.mem-hit .who.assistant { color: var(--cyan); }
+.mem-hit .snip { min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+mark { background: rgba(255, 182, 39, 0.22); color: #fff; border-radius: 2px; padding: 0 1px; }
+.mem-thread { padding: 14px 20px 30px; display: grid; gap: 12px; align-content: start; user-select: text; }
+.mem-msg { padding: 10px 14px; border: 1px solid var(--line); background: var(--panel-solid); }
+.mem-msg.user { border-left: 2px solid var(--amber); }
+.mem-msg.assistant { border-left: 2px solid var(--cyan-dim); }
+.mem-msg.match { border-color: var(--cyan-dim); box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.12); }
+.mem-msg-head { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; color: var(--text-dim); margin-bottom: 6px; }
+.mem-msg-head span { margin-left: 8px; color: var(--text-faint); letter-spacing: 0.06em; }
+.mem-msg-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14.5px; line-height: 1.5; }
+.mem-notes-bar { display: flex; gap: 6px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.mem-notes { display: flex; flex-direction: column; }
+.mem-editor { flex: none; min-height: 340px; height: 46vh; resize: vertical; margin: 14px 16px; width: auto; line-height: 1.5; font-size: 13px; }
+.mem-preview { padding: 14px 20px; user-select: text; }
+.mem-preview.inset { margin: 0 16px 10px; border: 1px solid var(--line); background: var(--bg-2); max-height: 360px; overflow-y: auto; }
+.mem-tools { margin: 4px 18px 0; padding-left: 16px; color: var(--text-dim); font-size: 13.5px; line-height: 1.7; }
+.mem-tools b { font-family: var(--font-mono); font-weight: 400; color: var(--cyan-2); font-size: 12px; }
+.mem-mcp { padding: 16px 22px; }
+.mem-mcp .warn { margin: 0 0 12px; }
+.summary-modal { width: min(820px, 92vw); max-height: 86vh; display: flex; flex-direction: column; }
+.summary-body { overflow-y: auto; min-height: 0; flex: 1; }
+.summary-title { font-weight: 600; font-size: 17px; }
+.summary-busy { display: flex; align-items: center; gap: 10px; color: var(--text-dim); padding: 30px 0; justify-content: center; }
+.summary-text { user-select: text; }
+.summary-intro { color: var(--text-dim); margin: 0; line-height: 1.5; }

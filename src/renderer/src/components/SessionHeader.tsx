@@ -12,6 +12,7 @@ interface Props {
   onCloseChat: () => void
   onRename: (title: string) => void
   onFork: () => void
+  onSummary: () => void
   onOpenProject: () => void
   onToggleWorkspace: (wsId: string, assigned: boolean) => void
 }
@@ -104,6 +105,11 @@ export function SessionHeader({ session: s, workspaces, ...p }: Props): React.JS
             </div>
           )}
         </div>
+        {s.filePath && (
+          <button className="btn ghost" onClick={p.onSummary} title="Resumo de passagem: o que foi feito, decisões e próximos passos">
+            ✦ Resumo
+          </button>
+        )}
         <button className="btn ghost" onClick={p.onOpenProject} title="Ver o repositório na Central de projetos">
           ⎇ Projeto
         </button>

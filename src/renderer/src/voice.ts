@@ -59,7 +59,8 @@ export interface CommandContext {
 /**
  * Comandos locais (falados ou digitados) — executados direto, sem passar pelo Claude:
  *   rotinas pelo nome ou gatilho ("modo foco") · "volume 30" · "modo escuro" · "dormir a tela"
- *   "rodar atalho <nome>" · "abrir sistema|projetos|sessões" · "abrir sessão|workspace <nome>"
+ *   "rodar atalho <nome>" · "abrir sistema|projetos|sessões|memória" · "abrir sessão|workspace <nome>"
+ *   "buscar <termos>" (nas conversas)
  *   "abrir <app>"
  * Retorna null quando a frase é um pedido para o Claude (fica na busca para confirmar).
  */
@@ -84,6 +85,13 @@ export function parseCommand(text: string, ctx: CommandContext): Command | null 
   if (/^(ativar\s+|ligar\s+)?modo claro$|^desativar modo escuro$/.test(t)) return { auto: { type: 'darkmode', target: 'off' }, say: 'Modo claro ativado.' }
   if (/^(dormir|apagar|desligar)\s+(a\s+)?tela$/.test(t)) return { auto: { type: 'sleep-display', target: '' }, say: 'Apagando a tela.' }
 
+  const find = /^(buscar|procurar|pesquisar)\s+(nas conversas\s+|na memoria\s+)?(por\s+|sobre\s+)?(.+)$/.exec(t)
+  if (find) {
+    // Usa o texto original (com acentos e aspas) — a busca já ignora acentos.
+    const original = cleanUtterance(text).replace(/^\S+\s+(nas conversas\s+|na mem[oó]ria\s+)?(por\s+|sobre\s+)?/i, '')
+    return { req: { type: 'search', query: original || find[4] }, say: `Buscando ${find[4]} nas conversas.` }
+  }
+
   const sc = /^(rodar|executar)\s+(o\s+)?atalho\s+(.+)$/.exec(t)
   if (sc) {
     const name = bestMatch(sc[3], ctx.shortcuts ?? [], (x) => x)
@@ -98,6 +106,7 @@ export function parseCommand(text: string, ctx: CommandContext): Command | null 
   if (/^(painel (do )?)?sistema|^monitor/.test(rest)) return { req: { type: 'module', id: 'system' }, say: 'Abrindo o painel do sistema.' }
   if (/^(central (de )?)?projetos$/.test(rest)) return { req: { type: 'module', id: 'projects' }, say: 'Abrindo a central de projetos.' }
   if (/^sessoes$/.test(rest)) return { req: { type: 'module', id: 'sessions' }, say: 'Abrindo as sessões.' }
+  if (/^(a )?memoria$/.test(rest)) return { req: { type: 'module', id: 'memory' }, say: 'Abrindo a memória.' }
   if (/^(automac(ao|oes)|rotinas)$/.test(rest)) return { req: { type: 'module', id: 'automation' }, say: 'Abrindo a automação.' }
 
   const target = /^(sessao|conversa|chat)\s+(.+)$/.exec(rest)

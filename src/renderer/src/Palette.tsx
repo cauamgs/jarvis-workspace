@@ -319,6 +319,7 @@ function actionLabel(say: string): string {
     .replace(/^Abrindo /, 'Abrir ')
     .replace(/^Executando /, 'Executar ')
     .replace(/^Rodando /, 'Rodar ')
+    .replace(/^Buscando /, 'Buscar ')
     .replace(/^Apagando /, 'Apagar ')
     .replace(/^Volume em (\d+) por cento$/, 'Volume em $1%')
     .replace(/^Modo (escuro|claro) ativado$/, 'Ativar modo $1')

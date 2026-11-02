@@ -95,4 +95,20 @@ npm run dev
 - **Automação do Mac** (`src/main/automation.ts`): abrir apps, Atalhos do macOS, volume, aparência, dormir a
   tela e rotinas com vários passos, disparadas pela busca, por voz ou pelo módulo Automação.
 
+- **Memória** (`src/main/search.ts`, `memory.ts`, `summary.ts`, `mcp.ts`, módulo Memória na interface):
+  - **Busca nas conversas:** índice de texto de todas as sessões (pedidos, respostas e um resumo de cada ferramenta,
+    sem resultados de ferramentas), incremental e guardado em `search/`. Termos sem acento/maiúscula, "frase exata".
+    Também pela busca rápida ou voz: "buscar migration postgres".
+  - **Cadernos dos workspaces:** notas em Markdown por workspace (`memory/<id>.md`). Entram no prompt de sistema
+    de toda sessão nova do chat do Jarvis daquele projeto. O módulo também mostra (só leitura) o CLAUDE.md e as
+    memórias automáticas do Claude de cada projeto do workspace.
+  - **Resumo de passagem:** botão ✦ Resumo na sessão. Uma chamada avulsa ao Claude (sem ferramentas, sem gravar
+    sessão) escreve objetivo, o que foi feito, decisões, estado e próximos passos; "Continuar em nova sessão" abre uma
+    sessão limpa a partir dele. Guardado em `summaries/`.
+  - **Servidor MCP do Jarvis:** HTTP em `127.0.0.1:47821/mcp` (dev: 47822) com token (`mcp-token`). Ferramentas:
+    `buscar_conversas`, `ler_conversa`, `memoria_workspace`, `anotar_memoria`, `contexto_projeto`,
+    `estado_ambiente`, `logs_container`, `quem_alterou`. Os chats do Jarvis já o recebem; "Conectar ao Claude Code"
+    (aba Conexão) roda `claude mcp add --scope user` para que sessões do terminal e do Desktop também o tenham.
+    Só funciona com o Jarvis aberto.
+
 Os formatos do Claude são internos e podem mudar — o Jarvis nunca escreve neles.

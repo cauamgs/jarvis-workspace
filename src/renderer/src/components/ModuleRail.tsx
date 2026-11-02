@@ -1,7 +1,8 @@
-export type ModuleId = 'sessions' | 'system' | 'projects' | 'automation'
+export type ModuleId = 'sessions' | 'memory' | 'system' | 'projects' | 'automation'
 
 const MODULES: { id: ModuleId | 'projects'; icon: string; label: string; soon?: boolean }[] = [
   { id: 'sessions', icon: '◈', label: 'Sessões' },
+  { id: 'memory', icon: '❖', label: 'Memória' },
   { id: 'system', icon: '◔', label: 'Sistema' },
   { id: 'projects', icon: '⎇', label: 'Projetos' },
   { id: 'automation', icon: '⚡', label: 'Automação' }

@@ -11,6 +11,11 @@ import * as projects from './projects'
 import { Voice } from './voice'
 import * as automation from './automation'
 import { JarvisTray } from './tray'
+import { SearchIndex } from './search'
+import { MemoryStore, projectContext, workspacesFor } from './memory'
+import { SummaryStore } from './summary'
+import { McpBridge } from './mcp'
+import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import type {
   ChatEvent,
   ChatImage,
@@ -43,7 +48,23 @@ const ptys = new PtyManager(
   (key, data) => win?.webContents.send('pty:data', key, data),
   (key, code) => win?.webContents.send('pty:exit', key, code)
 )
-const chats = new ChatManager(onChatEvent)
+const search = new SearchIndex(join(userData, 'search'))
+const memory = new MemoryStore(join(userData, 'memory'))
+const summaries = new SummaryStore(join(userData, 'summaries'))
+const bridge = new McpBridge(
+  {
+    sessions: () => sessions,
+    workspaces: () => store.list(),
+    search,
+    memory,
+    summaries,
+    onMemoryChanged: (wsId) => win?.webContents.send('mem:changed', wsId)
+  },
+  app.isPackaged ? 47821 : 47822,
+  join(userData, 'mcp-token'),
+  app.isPackaged ? 'jarvis' : 'jarvis-dev'
+)
+const chats = new ChatManager(onChatEvent, chatExtras)
 const palette = new Palette(() => !!win?.isVisible())
 const tray = new JarvisTray({
   state: () => ({
@@ -74,7 +95,29 @@ const pending = new Map<string, Set<string>>()
 async function refreshSessions(): Promise<SessionInfo[]> {
   const titles = store.titles()
   sessions = (await indexer.listSessions()).map((s) => (titles[s.id] ? { ...s, title: titles[s.id] } : s))
+  void search.update(sessions)
   return sessions
+}
+
+/**
+ * Chats do Jarvis recebem o servidor MCP do próprio Jarvis e o caderno dos workspaces da pasta
+ * (sessões do terminal e do Desktop leem o caderno pela ferramenta memoria_workspace).
+ */
+async function chatExtras(cwd: string): Promise<{ mcpServers?: Record<string, McpServerConfig>; appendPrompt?: string }> {
+  const mcp = bridge.sdkConfig()
+  const notes = await Promise.all(
+    workspacesFor(cwd, store.list(), sessions).map(async (w) => {
+      const text = (await memory.get(w.id)).trim()
+      return text ? `## Workspace ${w.name}\n${text}` : ''
+    })
+  )
+  const body = notes.filter(Boolean).join('\n\n')
+  return {
+    mcpServers: mcp ? { [bridge.name]: mcp } : undefined,
+    appendPrompt: body
+      ? `# Memória dos workspaces (Jarvis WorkSpace)\nNotas registradas pelo usuário e por sessões anteriores para este projeto:\n\n${body}`
+      : undefined
+  }
 }
 
 function createWindow(): void {
@@ -201,7 +244,10 @@ function registerIpc(): void {
 
   ipcMain.handle('ws:list', () => store.list())
   ipcMain.handle('ws:save', (_e, ws: Workspace) => store.save(ws))
-  ipcMain.handle('ws:delete', (_e, id: string) => store.remove(id))
+  ipcMain.handle('ws:delete', async (_e, id: string) => {
+    await memory.remove(id)
+    return store.remove(id)
+  })
   ipcMain.handle('ws:assign', (_e, wsId: string, sessionId: string, assigned: boolean) =>
     store.assign(wsId, sessionId, assigned)
   )
@@ -322,6 +368,47 @@ function registerIpc(): void {
     return r ? automation.runRoutine(r) : [{ ok: false, output: 'Rotina não encontrada.' }]
   })
 
+  ipcMain.handle('mem:search', (_e, q: string, o?: { sessionIds?: string[]; role?: 'user' | 'assistant' }) => {
+    const t0 = Date.now()
+    const groups = search.search(q, { sessionIds: o?.sessionIds ? new Set(o.sessionIds) : undefined, role: o?.role })
+    return { groups, indexing: search.indexing, indexed: search.size, ms: Date.now() - t0 }
+  })
+  ipcMain.handle('mem:context', (_e, id: string, uuid?: string, radius?: number) => search.context(id, uuid, radius))
+  ipcMain.handle('mem:get', (_e, ws: string) => memory.get(ws))
+  ipcMain.handle('mem:set', (_e, ws: string, text: string) => memory.set(ws, text))
+  ipcMain.handle('mem:append', (_e, ws: string, note: string) => memory.append(ws, note, 'você'))
+  ipcMain.handle('mem:projectContext', (_e, p: string) => projectContext(p))
+  ipcMain.handle('summary:get', async (_e, id: string) => ({
+    summary: await summaries.get(id),
+    running: summaries.isRunning(id),
+    messageCount: search.messages(id).length
+  }))
+  ipcMain.handle('summary:generate', async (_e, id: string) => {
+    const s = sessions.find((x) => x.id === id)
+    if (!s) return { ok: false, error: 'Sessão não encontrada.' }
+    await search.update(sessions)
+    try {
+      return { ok: true, summary: await summaries.generate(id, search.messages(id), s.cwd || s.projectPath) }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.handle('mcp:status', () => bridge.status())
+  ipcMain.handle('mcp:connect', async () => {
+    try {
+      return { ok: true, status: await bridge.connect() }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.handle('mcp:disconnect', async () => {
+    try {
+      return { ok: true, status: await bridge.disconnect() }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   ipcMain.handle('sys:pickDirectory', async () => {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] })
     return r.canceled ? null : r.filePaths[0]
@@ -335,7 +422,8 @@ app.on('second-instance', () => showMain())
 
 app.whenReady().then(async () => {
   app.setName('Jarvis WorkSpace')
-  await Promise.all([indexer.load(), store.load(), routines.load()])
+  await Promise.all([indexer.load(), store.load(), routines.load(), search.load()])
+  await bridge.start()
   registerIpc()
   createWindow()
   palette.create()
@@ -358,6 +446,8 @@ app.on('before-quit', () => {
   chats.closeAll()
   watchers.forEach((w) => w.close())
   void indexer.persist()
+  void search.persist()
+  bridge.stop()
 })
 
 app.on('will-quit', () => globalShortcut.unregisterAll())

@@ -303,8 +303,67 @@ export type NavRequest =
   | { type: 'session'; id: string; send?: string; voice?: boolean }
   | { type: 'workspace'; id: string }
   | { type: 'new'; cwd: string; workspaceId?: string; text?: string; voice?: boolean }
-  | { type: 'module'; id: 'sessions' | 'system' | 'projects' | 'automation' }
+  | { type: 'module'; id: 'sessions' | 'system' | 'projects' | 'automation' | 'memory' }
+  | { type: 'search'; query: string }
   | { type: 'project'; path: string }
+
+// ---------- memória: busca nas conversas, cadernos, resumos e MCP ----------
+
+export interface SearchHit {
+  uuid: string
+  role: 'user' | 'assistant'
+  timestamp: number
+  snippet: string
+}
+
+export interface SearchGroup {
+  sessionId: string
+  total: number
+  lastHit: number
+  hits: SearchHit[]
+}
+
+export interface SearchResult {
+  groups: SearchGroup[]
+  /** Índice ainda sendo construído (resultados parciais). */
+  indexing: boolean
+  indexed: number
+  ms: number
+}
+
+export interface ContextMessage {
+  uuid: string
+  role: 'user' | 'assistant'
+  timestamp: number
+  text: string
+  match?: boolean
+}
+
+export interface MemoryFile {
+  path: string
+  kind: 'project' | 'auto' | 'user'
+  label: string
+  text: string
+}
+
+export interface SessionSummary {
+  sessionId: string
+  createdAt: number
+  /** Mensagens da sessão quando o resumo foi gerado (para saber se ficou desatualizado). */
+  messageCount: number
+  text: string
+}
+
+export interface McpBridgeStatus {
+  running: boolean
+  error?: string
+  url: string
+  name: string
+  /** Registrado no escopo de usuário do Claude Code. */
+  registered: boolean
+  /** Registro aponta para este endereço e token. */
+  current: boolean
+}
 
 export interface JarvisApi {
   listSessions(): Promise<SessionInfo[]>
@@ -394,6 +453,19 @@ export interface JarvisApi {
   autoSaveRoutine(r: Routine): Promise<Routine[]>
   autoDeleteRoutine(id: string): Promise<Routine[]>
   autoRunRoutine(id: string): Promise<AutoResult[]>
+
+  searchConversations(query: string, opts?: { sessionIds?: string[]; role?: 'user' | 'assistant' }): Promise<SearchResult>
+  searchContext(sessionId: string, uuid?: string, radius?: number): Promise<ContextMessage[]>
+  memoryGet(wsId: string): Promise<string>
+  memorySet(wsId: string, text: string): Promise<void>
+  memoryAppend(wsId: string, note: string): Promise<void>
+  onMemoryChanged(cb: (wsId: string) => void): () => void
+  projectContext(path: string): Promise<MemoryFile[]>
+  summaryGet(sessionId: string): Promise<{ summary: SessionSummary | null; running: boolean; messageCount: number }>
+  summaryGenerate(sessionId: string): Promise<{ ok: boolean; summary?: SessionSummary; error?: string }>
+  mcpBridgeStatus(): Promise<McpBridgeStatus>
+  mcpBridgeConnect(): Promise<{ ok: boolean; status?: McpBridgeStatus; error?: string }>
+  mcpBridgeDisconnect(): Promise<{ ok: boolean; status?: McpBridgeStatus; error?: string }>
 
   pickDirectory(): Promise<string | null>
   openInFinder(path: string): void
